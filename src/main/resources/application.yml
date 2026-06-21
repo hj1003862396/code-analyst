@@ -1,0 +1,11 @@
+server:
+  port: 8080
+spring:
+  application:
+    name: code-analysis
+
+analyst:
+  project-root: /Users/hanjie/IdeaProjects/charging-ionchi
+  api-key: sk-idY301ee0674c883dbfe9018d5fe5f3417096b7fbc60Hs80
+  base-url: https://api.gptsapi.net/
+  model: gpt-5.4-nano
