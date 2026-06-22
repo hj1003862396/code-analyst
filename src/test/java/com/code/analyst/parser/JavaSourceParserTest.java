@@ -96,4 +96,31 @@ public class JavaSourceParserTest {
         List<MethodCallInfo> calls = parser.parseMethodCalls(tempFile.getAbsolutePath(), "show");
         assertEquals(0, calls.size(), "All utility, config, constant, helper, and exception calls should be filtered out");
     }
+
+    @Test
+    public void testChainedAndJdkMethodCallFiltering() throws Exception {
+        JavaSourceParser parser = new JavaSourceParser();
+        File tempFile = File.createTempFile("FinanceControllerMock", ".java");
+        tempFile.deleteOnExit();
+        
+        try (FileWriter writer = new FileWriter(tempFile)) {
+            writer.write(
+                "package com.example;\n" +
+                "public class FinanceControllerMock {\n" +
+                "    private InvoiceManageService invoiceManageService;\n" +
+                "    public void saveInvoiceWithoutTitle(InvoiceWithTitleReq req) {\n" +
+                "        req.getTaxNo().replace(\" \", \"\");\n" +
+                "        LoginUser loginUser = ContextUtils.getLoginUser();\n" +
+                "        long userId = loginUser.getAccountId().intValue();\n" +
+                "        invoiceManageService.toInvoiceApply(userId);\n" +
+                "    }\n" +
+                "}\n"
+            );
+        }
+        
+        List<MethodCallInfo> calls = parser.parseMethodCalls(tempFile.getAbsolutePath(), "saveInvoiceWithoutTitle");
+        assertEquals(1, calls.size(), "Should only keep the business call to invoiceManageService.toInvoiceApply");
+        assertEquals("invoiceManageService", calls.get(0).getObjectName());
+        assertEquals("toInvoiceApply", calls.get(0).getMethodName());
+    }
 }

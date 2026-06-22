@@ -5,8 +5,8 @@ const { createApp, ref, nextTick } = Vue;
 createApp({
     setup() {
         const entry = ref({
-            className: 'com.omp.marketing.intf.web.ShortLinkController',
-            methodName: 'detail'
+            className: 'com.omp.finance.intf.app.FinanceController',
+            methodName: 'saveInvoiceWithoutTitle'
         });
 
         const leftCardCollapsed = ref(false);
