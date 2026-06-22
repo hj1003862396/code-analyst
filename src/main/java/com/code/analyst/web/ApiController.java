@@ -524,9 +524,22 @@ public class ApiController {
       }
 
       private Optional<Path> findImplementationBySearch(String rootPath, String interfaceSimpleName, String interfaceFqName) {
-          try (java.util.stream.Stream<Path> walk = Files.walk(Path.of(rootPath))) {
-              java.util.List<Path> candidates = walk.filter(p -> p.toString().endsWith(".java"))
-                      .parallel()
+          ensureIndexInitialized(rootPath);
+          List<Path> allJavaFiles = new ArrayList<>();
+          for (List<Path> paths : javaFileByNameCache.values()) {
+              allJavaFiles.addAll(paths);
+          }
+          try {
+              String lowerInterface = interfaceSimpleName.toLowerCase();
+              String minMatchPrefix = lowerInterface.length() > 4 ? lowerInterface.substring(0, lowerInterface.length() / 2) : lowerInterface;
+
+              java.util.List<Path> candidates = allJavaFiles.parallelStream()
+                      .filter(p -> {
+                          String filename = p.getFileName().toString().toLowerCase().replace(".java", "");
+                          return filename.contains(lowerInterface) 
+                                  || lowerInterface.contains(filename)
+                                  || filename.contains(minMatchPrefix);
+                      })
                       .filter(p -> {
                           try {
                               String content = Files.readString(p);
@@ -557,6 +570,27 @@ public class ApiController {
       private String resolveImplementation(String root, String type, String fullTargetClassName) {
           if (fullTargetClassName == null || fullTargetClassName.isEmpty() || fullTargetClassName.contains("Impl")) {
               return fullTargetClassName;
+          }
+
+          // 接口预检：如果是普通的 class (非 interface)，无需检索实现类，直接返回
+          Optional<Path> pathOpt = findJavaFileByFqName(root, fullTargetClassName);
+          if (pathOpt.isPresent()) {
+              try {
+                  com.github.javaparser.ast.CompilationUnit cu = com.github.javaparser.StaticJavaParser.parse(pathOpt.get().toFile());
+                  boolean isInterface = cu.findAll(com.github.javaparser.ast.body.ClassOrInterfaceDeclaration.class).stream()
+                          .anyMatch(com.github.javaparser.ast.body.ClassOrInterfaceDeclaration::isInterface);
+                  if (!isInterface) {
+                      return fullTargetClassName;
+                  }
+                  // 如果是 Feign 客户端接口（由 Spring 动态代理生成），直接返回
+                  boolean isFeign = cu.findAll(com.github.javaparser.ast.body.ClassOrInterfaceDeclaration.class).stream()
+                          .filter(com.github.javaparser.ast.body.ClassOrInterfaceDeclaration::isInterface)
+                          .flatMap(cid -> cid.getAnnotations().stream())
+                          .anyMatch(ann -> ann.getNameAsString().equals("FeignClient"));
+                  if (isFeign) {
+                      return fullTargetClassName;
+                  }
+              } catch (Exception ignored) {}
           }
 
           // 1. 启发式命名通道 (直接寻找 *Impl)

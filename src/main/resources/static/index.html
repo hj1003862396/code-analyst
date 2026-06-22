@@ -98,10 +98,10 @@
         </div>
         <el-form label-position="top">
             <el-form-item label="Java 类名">
-                <el-input v-model="entry.className" placeholder="com.example.service.impl.UserServiceImpl"></el-input>
+                <el-input v-model="entry.className" placeholder="com.omp.finance.intf.app.FinanceController"></el-input>
             </el-form-item>
             <el-form-item label="Java 方法名">
-                <el-input v-model="entry.methodName" placeholder="getUserInfo"></el-input>
+                <el-input v-model="entry.methodName" placeholder="saveInvoiceWithoutTitle"></el-input>
             </el-form-item>
             <el-button type="success" @click="initTree" style="width: 100%; margin-top: 10px;">加载调用链</el-button>
         </el-form>

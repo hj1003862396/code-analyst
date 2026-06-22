@@ -37,6 +37,19 @@ public class JavaSourceParser {
                 .filter(m -> m.getNameAsString().equals(targetMethodName))
                 .findFirst()
                 .ifPresent(method -> {
+                    // Find the class containing this method
+                    String classNameTmp = "Unknown";
+                    java.util.Optional<com.github.javaparser.ast.body.ClassOrInterfaceDeclaration> parentClass = method.findAncestor(com.github.javaparser.ast.body.ClassOrInterfaceDeclaration.class);
+                    if (parentClass.isPresent()) {
+                        classNameTmp = parentClass.get().getNameAsString();
+                    } else {
+                        java.util.Optional<com.github.javaparser.ast.body.ClassOrInterfaceDeclaration> firstClass = cu.findFirst(com.github.javaparser.ast.body.ClassOrInterfaceDeclaration.class);
+                        if (firstClass.isPresent()) {
+                            classNameTmp = firstClass.get().getNameAsString();
+                        }
+                    }
+                    final String currentClassName = classNameTmp;
+
                     // 3. Scan parameters and local variables inside the method
                     Map<String, String> localTypes = new HashMap<>(fieldTypes);
                     method.getParameters().forEach(param -> {
@@ -51,15 +64,20 @@ public class JavaSourceParser {
                         @Override
                         public void visit(MethodCallExpr n, Void arg) {
                             super.visit(n, arg);
-                            n.getScope().ifPresent(scope -> {
-                                String objectName = scope.toString();
-                                String callMethod = n.getNameAsString();
-                                String objectType = localTypes.getOrDefault(objectName, "Unknown");
-                                if (isIgnoredCall(objectName, objectType, callMethod)) {
-                                    return;
-                                }
-                                calls.add(new MethodCallInfo(objectName, callMethod, objectType));
-                            });
+                            String objectName;
+                            String objectType;
+                            String callMethod = n.getNameAsString();
+                            if (n.getScope().isPresent()) {
+                                objectName = n.getScope().get().toString();
+                                objectType = localTypes.getOrDefault(objectName, "Unknown");
+                            } else {
+                                objectName = "this";
+                                objectType = currentClassName;
+                            }
+                            if (isIgnoredCall(objectName, objectType, callMethod)) {
+                                return;
+                            }
+                            calls.add(new MethodCallInfo(objectName, callMethod, objectType));
                         }
                     }, null);
                 });
@@ -103,6 +121,9 @@ public class JavaSourceParser {
         // 过滤标准 JDK 类型调用
         if ("Unknown".equals(objectType) && objectName.length() > 0 && Character.isUpperCase(objectName.charAt(0))) {
             objectType = objectName;
+            if (objectType.contains(".")) {
+                objectType = objectType.substring(0, objectType.indexOf('.'));
+            }
         }
 
         if (objectType != null) {
@@ -119,12 +140,18 @@ public class JavaSourceParser {
                 return true;
             }
             
-            // 过滤 DTO, Entity, VO, PO, Req, Resp 等类型
+            // 过滤 DTO, Entity, VO, PO, Req, Resp 等类型以及工具、常量、配置、上下文、辅助和异常类型
             String lowerType = cleanType.toLowerCase();
             if (lowerType.endsWith("dto") || lowerType.endsWith("entity") || lowerType.endsWith("vo") 
                     || (lowerType.endsWith("po") && !lowerType.endsWith("repo")) 
                     || lowerType.endsWith("req") || lowerType.endsWith("resp") || lowerType.endsWith("request") || lowerType.endsWith("response")
-                    || lowerType.endsWith("param") || lowerType.endsWith("params") || lowerType.endsWith("query")) {
+                    || lowerType.endsWith("param") || lowerType.endsWith("params") || lowerType.endsWith("query")
+                    || lowerType.endsWith("util") || lowerType.endsWith("utils") 
+                    || lowerType.endsWith("helper") || lowerType.endsWith("helpers")
+                    || lowerType.endsWith("context") || lowerType.endsWith("contexts") 
+                    || lowerType.endsWith("config") || lowerType.endsWith("configs")
+                    || lowerType.endsWith("constant") || lowerType.endsWith("constants") 
+                    || lowerType.endsWith("exception") || lowerType.endsWith("exceptions")) {
                 return true;
             }
         }
