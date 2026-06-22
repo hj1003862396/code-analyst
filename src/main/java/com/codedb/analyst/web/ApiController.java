@@ -143,16 +143,8 @@ public class ApiController {
                         dbOps = sqlExtractor.extractDbOperations(sql);
                     }
                     
-                    // Fallback for MyBatis-Plus default CRUD method names
-                    if (dbOps.isEmpty() && (method.equals("insert") || method.equals("selectById") || method.equals("updateById") || method.equals("deleteById") || method.equals("selectList") || method.equals("delete"))) {
-                        // Extract Table Name by Mapper class name heuristic e.g. OrderMapper -> t_order
-                        String tableName = "t_" + camelToSnake(type.replace("Mapper", "").replace("mapper", ""));
-                        String opType = "UNKNOWN";
-                        if (method.contains("select")) opType = "SELECT";
-                        else if (method.contains("insert")) opType = "INSERT";
-                        else if (method.contains("update")) opType = "UPDATE";
-                        else if (method.contains("delete")) opType = "DELETE";
-                        dbOps = List.of(new DbOperation(tableName, opType, Collections.emptyList(), "", ""));
+                    if (dbOps.isEmpty()) {
+                        dbOps = getFallbackDbOps(root, type, fullTargetClassName, method);
                     }
                 } else {
                     dbOps = getTransitiveDbOperations(root, fullTargetClassName, method, new HashSet<>());
@@ -211,14 +203,9 @@ public class ApiController {
                         dbOps = sqlExtractor.extractDbOperations(sql);
                     }
                     
-                    if (dbOps.isEmpty() && (method.equals("insert") || method.equals("selectById") || method.equals("updateById") || method.equals("deleteById") || method.equals("selectList") || method.equals("delete"))) {
-                        String tableName = "t_" + camelToSnake(type.replace("Mapper", "").replace("mapper", ""));
-                        String opType = "UNKNOWN";
-                        if (method.contains("select")) opType = "SELECT";
-                        else if (method.contains("insert")) opType = "INSERT";
-                        else if (method.contains("update")) opType = "UPDATE";
-                        else if (method.contains("delete")) opType = "DELETE";
-                        dbOps = List.of(new DbOperation(tableName, opType, Collections.emptyList(), "", ""));
+                    if (dbOps.isEmpty()) {
+                        String fullTargetClassName = resolveFullClassName(root, type, fileOpt.get().toString());
+                        dbOps = getFallbackDbOps(root, type, fullTargetClassName, method);
                     }
                     ops.addAll(dbOps);
                 } else {
@@ -530,5 +517,80 @@ public class ApiController {
           }
 
           return fullTargetClassName;
+      }
+
+      private String getTableNameFromMapper(String root, String fullMapperClassName) {
+          Optional<Path> mapperPathOpt = findJavaFileByFqName(root, fullMapperClassName);
+          if (mapperPathOpt.isEmpty()) {
+              return null;
+          }
+          try {
+              com.github.javaparser.ast.CompilationUnit cu = com.github.javaparser.StaticJavaParser.parse(mapperPathOpt.get().toFile());
+              return cu.findAll(com.github.javaparser.ast.body.ClassOrInterfaceDeclaration.class).stream()
+                      .filter(com.github.javaparser.ast.body.ClassOrInterfaceDeclaration::isInterface)
+                      .flatMap(cid -> cid.getExtendedTypes().stream())
+                      .filter(et -> et.getNameAsString().equals("BaseMapper"))
+                      .flatMap(et -> et.getTypeArguments().map(java.util.Collection::stream).orElse(java.util.stream.Stream.empty()))
+                      .findFirst()
+                      .map(typeArg -> {
+                          String entitySimpleName = typeArg.toString();
+                          String entityFqName = resolveFullClassName(root, entitySimpleName, mapperPathOpt.get().toString());
+                          Optional<Path> entityPathOpt = findJavaFileByFqName(root, entityFqName);
+                          if (entityPathOpt.isPresent()) {
+                              try {
+                                  com.github.javaparser.ast.CompilationUnit entityCu = com.github.javaparser.StaticJavaParser.parse(entityPathOpt.get().toFile());
+                                  return entityCu.findAll(com.github.javaparser.ast.body.ClassOrInterfaceDeclaration.class).stream()
+                                          .filter(ecid -> !ecid.isInterface())
+                                          .flatMap(ecid -> ecid.getAnnotations().stream())
+                                          .filter(ann -> ann.getNameAsString().equals("TableName"))
+                                          .findFirst()
+                                          .map(ann -> {
+                                              String val = ann.toString();
+                                              java.util.regex.Matcher m = java.util.regex.Pattern.compile("\"([^\"]+)\"").matcher(val);
+                                              if (m.find()) {
+                                                  return m.group(1);
+                                              }
+                                              return null;
+                                          }).orElse(null);
+                              } catch (Exception ignored) {}
+                          }
+                          return null;
+                      }).orElse(null);
+          } catch (Exception ignored) {}
+          return null;
+      }
+
+      private List<DbOperation> getFallbackDbOps(String root, String type, String fullTargetClassName, String method) {
+          if (method.equals("insert") || method.equals("selectById") || method.equals("updateById") || method.equals("deleteById") || method.equals("selectList") || method.equals("delete")) {
+              String tableName = getTableNameFromMapper(root, fullTargetClassName);
+              if (tableName == null || tableName.isEmpty()) {
+                  tableName = "t_" + camelToSnake(type.replace("Mapper", "").replace("mapper", ""));
+              }
+              String opType = "UNKNOWN";
+              String mockSql = "";
+              if (method.contains("select")) {
+                  opType = "SELECT";
+                  if (method.equals("selectById")) {
+                      mockSql = "SELECT * FROM " + tableName + " WHERE id = ?";
+                  } else {
+                      mockSql = "SELECT * FROM " + tableName;
+                  }
+              } else if (method.contains("insert")) {
+                  opType = "INSERT";
+                  mockSql = "INSERT INTO " + tableName + " (...) VALUES (...)";
+              } else if (method.contains("update")) {
+                  opType = "UPDATE";
+                  mockSql = "UPDATE " + tableName + " SET ... WHERE id = ?";
+              } else if (method.contains("delete")) {
+                  opType = "DELETE";
+                  if (method.equals("deleteById")) {
+                      mockSql = "DELETE FROM " + tableName + " WHERE id = ?";
+                  } else {
+                      mockSql = "DELETE FROM " + tableName + " WHERE ...";
+                  }
+              }
+              return List.of(new DbOperation(tableName, opType, Collections.emptyList(), "", mockSql));
+          }
+          return Collections.emptyList();
       }
   }

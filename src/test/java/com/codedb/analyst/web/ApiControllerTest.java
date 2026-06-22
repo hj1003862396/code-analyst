@@ -148,4 +148,38 @@ public class ApiControllerTest {
         assertTrue(res.isPresent());
         System.out.println("RESOLVED REPO IMPL WITH SERVICE REF PATH: " + res.get());
     }
+
+    @Test
+    public void testGetTableNameFromMapperAnnotation() throws Exception {
+        com.codedb.analyst.config.ConfigManager configManager = new com.codedb.analyst.config.ConfigManager();
+        com.codedb.analyst.config.AppConfig config = new com.codedb.analyst.config.AppConfig();
+        config.setProjectRoot("/Users/hanjie/IdeaProjects/charging-ionchi");
+        configManager.saveConfig(config);
+        
+        ApiController controller = new ApiController(configManager, new com.codedb.analyst.parser.JavaSourceParser(), new com.codedb.analyst.parser.SqlExtractor(), null);
+        
+        java.lang.reflect.Method getTableName = ApiController.class.getDeclaredMethod("getTableNameFromMapper", String.class, String.class);
+        getTableName.setAccessible(true);
+        
+        String tableName = (String) getTableName.invoke(
+            controller, 
+            "/Users/hanjie/IdeaProjects/charging-ionchi",
+            "com.omp.marketing.infrastructure.repository.impl.mybatis.shortlink.ShortLinkMapper"
+        );
+        assertEquals("t_marketing_short_link", tableName);
+
+        java.lang.reflect.Method getFallback = ApiController.class.getDeclaredMethod("getFallbackDbOps", String.class, String.class, String.class, String.class);
+        getFallback.setAccessible(true);
+        
+        java.util.List<com.codedb.analyst.parser.DbOperation> dbOps = (java.util.List<com.codedb.analyst.parser.DbOperation>) getFallback.invoke(
+            controller,
+            "/Users/hanjie/IdeaProjects/charging-ionchi",
+            "ShortLinkMapper",
+            "com.omp.marketing.infrastructure.repository.impl.mybatis.shortlink.ShortLinkMapper",
+            "selectById"
+        );
+        assertEquals(1, dbOps.size());
+        assertEquals("t_marketing_short_link", dbOps.get(0).getTableName());
+        assertEquals("SELECT * FROM t_marketing_short_link WHERE id = ?", dbOps.get(0).getSql());
+    }
 }

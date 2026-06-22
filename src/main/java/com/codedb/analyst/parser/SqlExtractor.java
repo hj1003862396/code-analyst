@@ -60,7 +60,7 @@ public class SqlExtractor {
                     Element el = (Element) list.item(i);
                     String id = el.getAttribute("id");
                     if (id != null && !id.isEmpty()) {
-                        newSqlMap.put(id, el.getTextContent());
+                        newSqlMap.put(id, getElementSqlText(el, doc));
                     }
                 }
             }
@@ -70,6 +70,73 @@ public class SqlExtractor {
         } catch (Exception e) {
             return "";
         }
+    }
+
+    private String getElementSqlText(org.w3c.dom.Node node, Document doc) {
+        if (node == null) return "";
+        if (node.getNodeType() == org.w3c.dom.Node.TEXT_NODE) {
+            return node.getNodeValue();
+        }
+        if (node.getNodeType() == org.w3c.dom.Node.ELEMENT_NODE) {
+            Element el = (Element) node;
+            if ("include".equals(el.getTagName())) {
+                String refid = el.getAttribute("refid");
+                if (refid != null && !refid.isEmpty()) {
+                    Element sqlNode = findSqlNodeById(doc, refid);
+                    if (sqlNode != null) {
+                        return getElementSqlText(sqlNode, doc);
+                    }
+                }
+                return "";
+            }
+            StringBuilder sb = new StringBuilder();
+            org.w3c.dom.NodeList children = el.getChildNodes();
+            for (int i = 0; i < children.getLength(); i++) {
+                sb.append(getElementSqlText(children.item(i), doc));
+            }
+            return sb.toString();
+        }
+        return "";
+    }
+
+    private Element findSqlNodeById(Document doc, String id) {
+        NodeList sqlList = doc.getElementsByTagName("sql");
+        for (int i = 0; i < sqlList.getLength(); i++) {
+            Element sqlEl = (Element) sqlList.item(i);
+            if (id.equals(sqlEl.getAttribute("id"))) {
+                return sqlEl;
+            }
+        }
+        return null;
+    }
+
+    private String extractTableNameHeuristic(String sql, String type) {
+        if (sql == null || sql.isEmpty()) {
+            return "unknown_table";
+        }
+        String cleanSql = sql.replaceAll("<[^>]+>", " ")
+                .replaceAll("#\\{[^\\}]+\\}", "?")
+                .replaceAll("\\$\\{[^\\}]+\\}", "?")
+                .replaceAll("\\s+", " ")
+                .trim();
+        java.util.regex.Pattern pattern = null;
+        if ("SELECT".equals(type)) {
+            pattern = java.util.regex.Pattern.compile("from\\s+([a-zA-Z0-9_`\\.]+)", java.util.regex.Pattern.CASE_INSENSITIVE);
+        } else if ("INSERT".equals(type)) {
+            pattern = java.util.regex.Pattern.compile("insert\\s+into\\s+([a-zA-Z0-9_`\\.]+)", java.util.regex.Pattern.CASE_INSENSITIVE);
+        } else if ("UPDATE".equals(type)) {
+            pattern = java.util.regex.Pattern.compile("update\\s+([a-zA-Z0-9_`\\.]+)", java.util.regex.Pattern.CASE_INSENSITIVE);
+        } else if ("DELETE".equals(type)) {
+            pattern = java.util.regex.Pattern.compile("delete\\s+from\\s+([a-zA-Z0-9_`\\.]+)", java.util.regex.Pattern.CASE_INSENSITIVE);
+        }
+        
+        if (pattern != null) {
+            java.util.regex.Matcher matcher = pattern.matcher(cleanSql);
+            if (matcher.find()) {
+                return matcher.group(1).replace("`", "").trim();
+            }
+        }
+        return "unknown_table";
     }
 
     public List<DbOperation> extractDbOperations(String sql) {
@@ -141,13 +208,17 @@ public class SqlExtractor {
             List<DbOperation> fallback = new ArrayList<>();
             String lower = sql.toLowerCase();
             if (lower.contains("select") && lower.contains("from")) {
-                fallback.add(new DbOperation("unknown_table", "SELECT", Collections.emptyList(), "", sql));
+                String tableName = extractTableNameHeuristic(sql, "SELECT");
+                fallback.add(new DbOperation(tableName, "SELECT", Collections.emptyList(), "", sql));
             } else if (lower.contains("insert") && lower.contains("into")) {
-                fallback.add(new DbOperation("unknown_table", "INSERT", Collections.emptyList(), "", sql));
+                String tableName = extractTableNameHeuristic(sql, "INSERT");
+                fallback.add(new DbOperation(tableName, "INSERT", Collections.emptyList(), "", sql));
             } else if (lower.contains("update")) {
-                fallback.add(new DbOperation("unknown_table", "UPDATE", Collections.emptyList(), "", sql));
+                String tableName = extractTableNameHeuristic(sql, "UPDATE");
+                fallback.add(new DbOperation(tableName, "UPDATE", Collections.emptyList(), "", sql));
             } else if (lower.contains("delete") && lower.contains("from")) {
-                fallback.add(new DbOperation("unknown_table", "DELETE", Collections.emptyList(), "", sql));
+                String tableName = extractTableNameHeuristic(sql, "DELETE");
+                fallback.add(new DbOperation(tableName, "DELETE", Collections.emptyList(), "", sql));
             }
             return fallback;
         }
