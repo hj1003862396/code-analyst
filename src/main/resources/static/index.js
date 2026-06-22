@@ -1,4 +1,4 @@
-import MindMap from 'https://cdn.jsdelivr.net/npm/simple-mind-map@0.14.0/dist/simpleMindMap.esm.min.js';
+import MindMap from './lib/simple-mind-map/simpleMindMap.esm.min.js';
 
 const { createApp, ref, nextTick } = Vue;
 
@@ -59,44 +59,93 @@ createApp({
             const data = node.nodeData.data;
             if (!data) return null;
 
+            // 外部包装容器，为右侧绝对定位的 + - 按钮预留空间，防止被 SVG foreignObject 剪裁
+            const wrapper = document.createElement('div');
+            wrapper.className = 'mindmap-card-wrapper';
+
             // 卡片主容器
             const div = document.createElement('div');
             div.className = 'mindmap-card';
             if (data.isMapper) {
                 div.classList.add('is-mapper');
-            }
-            if (rawTreeData && data.id === rawTreeData.id) {
+            } else if (rawTreeData && data.id === rawTreeData.id) {
                 div.classList.add('is-root');
+            } else {
+                div.classList.add('is-service');
             }
 
-            // 头部
-            const header = document.createElement('div');
-            header.className = 'card-header';
+            // 1. 头部标题区：指示器与类型文本
+            const headerType = document.createElement('div');
+            headerType.className = 'card-header-type';
             
-            const icon = document.createElement('span');
-            icon.className = 'card-icon';
-            icon.innerText = data.isMapper ? '💾' : '⚡';
-            
-            const title = document.createElement('span');
-            title.className = 'card-title';
-            title.innerText = data.methodName || data.text || '';
+            const indicator = document.createElement('span');
+            indicator.className = 'header-indicator';
+            headerType.appendChild(indicator);
 
-            header.appendChild(icon);
-            header.appendChild(title);
-            div.appendChild(header);
+            const headerText = document.createElement('span');
+            headerText.className = 'header-text';
+            if (rawTreeData && data.id === rawTreeData.id) {
+                headerText.innerText = '🎯 入口方法';
+            } else if (data.isMapper) {
+                headerText.innerText = '💾 Mapper 接口';
+            } else {
+                headerText.innerText = '⚡ Service 方法';
+            }
+            headerType.appendChild(headerText);
+            div.appendChild(headerType);
 
-            // 主体
+            // 2. 第一行：类名
+            if (data.className) {
+                const row = document.createElement('div');
+                row.className = 'card-row';
+                
+                const label = document.createElement('span');
+                label.className = 'row-label';
+                label.innerText = '类名';
+                row.appendChild(label);
+
+                const dotIdx = data.className.lastIndexOf('.');
+                const shortName = dotIdx !== -1 ? data.className.substring(dotIdx + 1) : data.className;
+                
+                const badge = document.createElement('span');
+                badge.className = 'row-badge';
+                badge.innerText = shortName;
+                badge.setAttribute('title', data.className); // 悬浮显示完整类名
+                row.appendChild(badge);
+                
+                div.appendChild(row);
+            }
+
+            // 3. 第二行：方法名
+            if (data.methodName || data.text) {
+                const row = document.createElement('div');
+                row.className = 'card-row';
+                
+                const label = document.createElement('span');
+                label.className = 'row-label';
+                label.innerText = '方法名';
+                row.appendChild(label);
+
+                const badge = document.createElement('span');
+                badge.className = 'row-badge';
+                badge.innerText = data.methodName || data.text || '';
+                row.appendChild(badge);
+
+                div.appendChild(row);
+            }
+
+            // 4. 主体内容区（备注 & SQL 语句）
             const body = document.createElement('div');
             body.className = 'card-body';
 
-            // 接口备注 (说明)
+            // 4.1 方法简介
             if (data.remarks) {
                 const remarksContainer = document.createElement('div');
                 remarksContainer.className = 'card-remarks-container';
                 
                 const remarksTitle = document.createElement('div');
                 remarksTitle.className = 'remarks-title';
-                remarksTitle.innerText = '说明';
+                remarksTitle.innerText = '方法简介';
                 remarksContainer.appendChild(remarksTitle);
 
                 const remarksContent = document.createElement('div');
@@ -107,7 +156,7 @@ createApp({
                 body.appendChild(remarksContainer);
             }
 
-            // SQL 语句展示 (仅 Mapper)
+            // 4.2 SQL 语句 (仅 Mapper 且有数据时展示)
             if (data.isMapper && data.dbOperations && data.dbOperations.length > 0) {
                 const sqlContainer = document.createElement('div');
                 sqlContainer.className = 'card-sql-container';
@@ -145,7 +194,9 @@ createApp({
                 div.appendChild(body);
             }
 
-            // 添加自定义贴边折叠/展开按钮
+            wrapper.appendChild(div);
+
+            // 5. 自定义贴边折叠/展开按钮 (挂载到 wrapper 容器上)
             const isLoaded = loadedSet.has(data.id);
             const rawNode = findNode(rawTreeData, data.id);
             
@@ -177,10 +228,10 @@ createApp({
                     }
                 });
                 
-                div.appendChild(btn);
+                wrapper.appendChild(btn);
             }
 
-            return div;
+            return wrapper;
         };
 
         // ─── 工具函数 ──────────────────────────────────────────────────────────────
@@ -312,6 +363,7 @@ createApp({
                         theme: 'classic',
                         readonly: true,
                         alwaysShowExpandBtn: false, // 禁用默认的展开按钮
+                        hoverRectColor: 'transparent', // 隐藏悬浮和激活选中时的外围蓝色矩形框
                         isUseCustomNodeContent: true,
                         customCreateNodeContent: (node) => {
                             return createCustomNodeDom(node);
@@ -319,6 +371,8 @@ createApp({
                         themeConfig: {
                             paddingX: 0,
                             paddingY: 0,
+                            lineColor: '#818cf8',
+                            lineWidth: 2,
                             root: {
                                 fillColor: 'transparent',
                                 borderColor: 'transparent',
@@ -326,6 +380,11 @@ createApp({
                                 active: {
                                     fillColor: 'transparent',
                                     borderColor: 'transparent'
+                                },
+                                hover: {
+                                    fillColor: 'transparent',
+                                    borderColor: 'transparent',
+                                    borderWidth: 0
                                 }
                             },
                             second: {
@@ -335,6 +394,11 @@ createApp({
                                 active: {
                                     fillColor: 'transparent',
                                     borderColor: 'transparent'
+                                },
+                                hover: {
+                                    fillColor: 'transparent',
+                                    borderColor: 'transparent',
+                                    borderWidth: 0
                                 }
                             },
                             node: {
@@ -344,6 +408,11 @@ createApp({
                                 active: {
                                     fillColor: 'transparent',
                                     borderColor: 'transparent'
+                                },
+                                hover: {
+                                    fillColor: 'transparent',
+                                    borderColor: 'transparent',
+                                    borderWidth: 0
                                 }
                             }
                         }

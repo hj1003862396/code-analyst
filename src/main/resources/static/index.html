@@ -5,18 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>code-analyst</title>
     <!-- 引入 Vue 3, Element Plus -->
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css" />
-    <script src="https://unpkg.com/element-plus"></script>
+    <script src="./lib/vue/vue.global.js"></script>
+    <link rel="stylesheet" href="./lib/element-plus/index.css" />
+    <script src="./lib/element-plus/index.full.min.js"></script>
     <!-- Marked 用于富文本渲染 -->
-    <script src="https://unpkg.com/marked/marked.min.js"></script>
+    <script src="./lib/marked/marked.min.js"></script>
     <!-- Google 字体 -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./lib/fonts/fonts.css">
     
     <!-- simple-mind-map 脑图样式 -->
-    <link href="https://cdn.jsdelivr.net/npm/simple-mind-map@0.14.0/dist/simpleMindMap.css" rel="stylesheet">
+    <link href="./lib/simple-mind-map/simpleMindMap.css" rel="stylesheet">
     
     <!-- 外部样式 -->
     <link rel="stylesheet" href="./index.css">
@@ -39,20 +37,20 @@
 <!--    </div>-->
 
     <!-- 2. 右上工具栏 -->
-    <div class="float-toolbar toolbar-top-right">
-        <button class="toolbar-btn share-btn" @click="shareLink">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#3b66e2" stroke-width="2.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
-            分享
-        </button>
-        <div class="toolbar-divider"></div>
-        <button class="toolbar-btn edit-btn">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-            编辑 <span style="font-size: 8px; margin-left: 2px;">▼</span>
-        </button>
-        <button class="toolbar-btn-icon" title="搜索"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></button>
-        <button class="toolbar-btn-icon" title="评论"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></button>
-        <button class="toolbar-btn-icon" title="更多"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1.5"></circle><circle cx="19" cy="12" r="1.5"></circle><circle cx="5" cy="12" r="1.5"></circle></svg></button>
-    </div>
+<!--    <div class="float-toolbar toolbar-top-right">-->
+<!--        <button class="toolbar-btn share-btn" @click="shareLink">-->
+<!--            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#3b66e2" stroke-width="2.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>-->
+<!--            分享-->
+<!--        </button>-->
+<!--        <div class="toolbar-divider"></div>-->
+<!--        <button class="toolbar-btn edit-btn">-->
+<!--            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>-->
+<!--            编辑 <span style="font-size: 8px; margin-left: 2px;">▼</span>-->
+<!--        </button>-->
+<!--        <button class="toolbar-btn-icon" title="搜索"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></button>-->
+<!--        <button class="toolbar-btn-icon" title="评论"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></button>-->
+<!--        <button class="toolbar-btn-icon" title="更多"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1.5"></circle><circle cx="19" cy="12" r="1.5"></circle><circle cx="5" cy="12" r="1.5"></circle></svg></button>-->
+<!--    </div>-->
 
     <!-- 3. 左侧浮动垂直工具栏 -->
 <!--    <div class="float-toolbar toolbar-left-vertical">-->
@@ -77,7 +75,7 @@
 <!--    </div>-->
 
     <!-- 4. 右下角工具栏：缩放与操控 -->
-    <div class="float-toolbar toolbar-bottom-right">
+    <!-- <div class="float-toolbar toolbar-bottom-right">
         <button class="toolbar-btn-icon" title="撤销" @click="undo"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg></button>
         <button class="toolbar-btn-icon" title="重做" @click="redo"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 7v6h-6"></path><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"></path></svg></button>
         <div class="toolbar-divider"></div>
@@ -88,7 +86,7 @@
         <button class="toolbar-btn-icon" @click="zoomIn" style="font-weight: bold; font-size: 16px;">+</button>
         <div class="toolbar-divider"></div>
         <button class="toolbar-btn-icon" title="帮助" @click="showHelp"><span style="font-size: 13px; font-weight: bold;">?</span></button>
-    </div>
+    </div> -->
 
     <!-- 5. 左下悬浮卡片：分析入口 -->
     <div class="left-input-card" :class="{ collapsed: leftCardCollapsed }">
