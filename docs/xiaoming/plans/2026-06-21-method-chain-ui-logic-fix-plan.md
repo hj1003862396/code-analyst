@@ -37,14 +37,14 @@
   
   创建 `src/test/java/com/codedb/analyst/web/ApiControllerTest.java`，内容如下：
   ```java
-  package com.codedb.analyst.web;
+  package com.code.analyst.web;
 
-  import org.junit.jupiter.api.Test;
+import com.code.analyst.CodeAnalystApplication;   import org.junit.jupiter.api.Test;
   import org.springframework.boot.test.context.SpringBootTest;
 
   import static org.junit.jupiter.api.Assertions.assertTrue;
 
-  @SpringBootTest(classes = com.codedb.analyst.CodeDbAnalystApplication.class)
+  @SpringBootTest(classes = CodeAnalystApplication.class)
   public class ApiControllerTest {
       @Test
       public void contextLoads() {
@@ -75,13 +75,13 @@
   ```java
       @Test
       public void testFindJavaFileWithDuplicates() throws Exception {
-          com.codedb.analyst.config.ConfigManager configManager = new com.codedb.analyst.config.ConfigManager();
-          com.codedb.analyst.config.AppConfig config = new com.codedb.analyst.config.AppConfig();
+          com.code.analyst.config.ConfigManager configManager = new com.code.analyst.config.ConfigManager();
+          com.code.analyst.config.AppConfig config = new com.code.analyst.config.AppConfig();
           config.setProjectRoot("/Users/hanjie/IdeaProjects/charging-ionchi");
           configManager.saveConfig(config);
 
-          com.codedb.analyst.parser.JavaSourceParser parser = new com.codedb.analyst.parser.JavaSourceParser();
-          com.codedb.analyst.parser.SqlExtractor extractor = new com.codedb.analyst.parser.SqlExtractor();
+          com.code.analyst.parser.JavaSourceParser parser = new com.code.analyst.parser.JavaSourceParser();
+          com.code.analyst.parser.SqlExtractor extractor = new com.code.analyst.parser.SqlExtractor();
           ApiController controller = new ApiController(configManager, parser, extractor, null);
 
           // 模拟调用方为 ShortLinkController.java

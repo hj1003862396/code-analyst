@@ -26,7 +26,7 @@
            xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
       <modelVersion>4.0.0</modelVersion>
 
-      <groupId>com.codedb</groupId>
+      <groupId>com.code</groupId>
       <artifactId>code-db-analyst</artifactId>
       <version>1.0.0</version>
 
@@ -87,7 +87,7 @@
 
 - [ ] **步骤 3：创建启动类 `CodeDbAnalystApplication.java`**
   ```java
-  package com.codedb.analyst;
+  package com.code.analyst;
 
   import org.springframework.boot.SpringApplication;
   import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -115,7 +115,7 @@
 
 - [ ] **步骤 1：写失败测试 `ConfigManagerTest.java`**
   ```java
-  package com.codedb.analyst.config;
+  package com.code.analyst.config;
 
   import org.junit.jupiter.api.Test;
   import static org.junit.jupiter.api.Assertions.*;
@@ -144,7 +144,7 @@
 
 - [ ] **步骤 2：创建配置实体类 `AppConfig.java`**
   ```java
-  package com.codedb.analyst.config;
+  package com.code.analyst.config;
 
   public class AppConfig {
       private String projectRoot;
@@ -167,7 +167,7 @@
 - [ ] **步骤 3：创建配置管理器 `ConfigManager.java`**
   用内存和临时系统文件存储配置。
   ```java
-  package com.codedb.analyst.config;
+  package com.code.analyst.config;
 
   import org.springframework.stereotype.Component;
 
@@ -201,7 +201,7 @@
 - [ ] **步骤 1：创建测试数据及 `JavaSourceParserTest.java`**
   写一个对 Dummy 代码文件进行方法调用提取的失败测试。
   ```java
-  package com.codedb.analyst.parser;
+  package com.code.analyst.parser;
 
   import org.junit.jupiter.api.Test;
   import org.junit.jupiter.api.io.TempDir;
@@ -245,7 +245,7 @@
 
 - [ ] **步骤 2：创建数据传输类 `MethodCallInfo.java`**
   ```java
-  package com.codedb.analyst.parser;
+  package com.code.analyst.parser;
 
   public class MethodCallInfo {
       private String objectName;
@@ -267,11 +267,10 @@
 - [ ] **步骤 3：编写源码解析实现类 `JavaSourceParser.java`**
   使用 JavaParser 解析 AST，并在方法体内提取局部变量或类成员变量对应的类型。
   ```java
-  package com.codedb.analyst.parser;
+  package com.code.analyst.parser;
 
   import com.github.javaparser.StaticJavaParser;
   import com.github.javaparser.ast.CompilationUnit;
-  import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
   import com.github.javaparser.ast.body.FieldDeclaration;
   import com.github.javaparser.ast.body.MethodDeclaration;
   import com.github.javaparser.ast.body.VariableDeclarator;
@@ -360,7 +359,7 @@
 - [ ] **步骤 1：创建测试文件 `SqlExtractorTest.java`**
   编写对 MyBatis Mapper XML SQL 的提取与物理表解析的失败测试。
   ```java
-  package com.codedb.analyst.parser;
+  package com.code.analyst.parser;
 
   import org.junit.jupiter.api.Test;
   import org.junit.jupiter.api.io.TempDir;
@@ -401,7 +400,7 @@
 
 - [ ] **步骤 2：创建数据模型类 `DbOperation.java`**
   ```java
-  package com.codedb.analyst.parser;
+  package com.code.analyst.parser;
 
   public class DbOperation {
       private String tableName;
@@ -420,7 +419,7 @@
 - [ ] **步骤 3：编写 `SqlExtractor.java` 服务类**
   包含 XML 精准读取和 JSqlParser 物理表解析。
   ```java
-  package com.codedb.analyst.parser;
+  package com.code.analyst.parser;
 
   import net.sf.jsqlparser.parser.CCJSqlParserUtil;
   import net.sf.jsqlparser.statement.Statement;
@@ -518,10 +517,10 @@
 - [ ] **步骤 1：编写测试类 `LlmServiceTest.java`**
   模拟调用或使用 Mock HTTP 服务器验证 Llm 请求逻辑。
   ```java
-  package com.codedb.analyst.llm;
+  package com.code.analyst.llm;
 
-  import com.codedb.analyst.config.AppConfig;
-  import com.codedb.analyst.config.ConfigManager;
+  import com.code.analyst.config.AppConfig;
+  import com.code.analyst.config.ConfigManager;
   import org.junit.jupiter.api.Test;
   import static org.junit.jupiter.api.Assertions.*;
 
@@ -547,10 +546,10 @@
 
 - [ ] **步骤 2：编写 `LlmService.java` 实现类**
   ```java
-  package com.codedb.analyst.llm;
+  package com.code.analyst.llm;
 
-  import com.codedb.analyst.config.AppConfig;
-  import com.codedb.analyst.config.ConfigManager;
+  import com.code.analyst.config.AppConfig;
+  import com.code.analyst.config.ConfigManager;
   import org.springframework.http.HttpEntity;
   import org.springframework.http.HttpHeaders;
   import org.springframework.http.MediaType;
@@ -649,9 +648,9 @@
 - [ ] **步骤 1：编写测试类 `ApiControllerTest.java`**
   编写对 Web 端 API 的 Spring Boot MockMvc 集成测试。
   ```java
-  package com.codedb.analyst.web;
+  package com.code.analyst.web;
 
-  import com.codedb.analyst.CodeDbAnalystApplication;
+  import com.code.analyst.CodeAnalystApplication;
   import org.junit.jupiter.api.Test;
   import org.springframework.beans.factory.annotation.Autowired;
   import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -663,7 +662,7 @@
   import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
   import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-  @SpringBootTest(classes = CodeDbAnalystApplication.class)
+  @SpringBootTest(classes = CodeAnalystApplication.class)
   @AutoConfigureMockMvc
   public class ApiControllerTest {
 
@@ -686,19 +685,18 @@
 
 - [ ] **步骤 2：创建控制器类 `ApiController.java`**
   ```java
-  package com.codedb.analyst.web;
+  package com.code.analyst.web;
 
-  import com.codedb.analyst.config.AppConfig;
-  import com.codedb.analyst.config.ConfigManager;
-  import com.codedb.analyst.llm.LlmService;
-  import com.codedb.analyst.parser.DbOperation;
-  import com.codedb.analyst.parser.JavaSourceParser;
-  import com.codedb.analyst.parser.MethodCallInfo;
-  import com.codedb.analyst.parser.SqlExtractor;
+  import com.code.analyst.config.AppConfig;
+  import com.code.analyst.config.ConfigManager;
+  import com.code.analyst.llm.LlmService;
+  import com.code.analyst.parser.DbOperation;
+  import com.code.analyst.parser.JavaSourceParser;
+  import com.code.analyst.parser.MethodCallInfo;
+  import com.code.analyst.parser.SqlExtractor;
   import org.springframework.http.ResponseEntity;
   import org.springframework.web.bind.annotation.*;
 
-  import java.io.File;
   import java.nio.file.Files;
   import java.nio.file.Path;
   import java.util.*;

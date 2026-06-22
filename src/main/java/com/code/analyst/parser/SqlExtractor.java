@@ -1,4 +1,4 @@
-package com.codedb.analyst.parser;
+package com.code.analyst.parser;
 
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
 import net.sf.jsqlparser.statement.Statement;

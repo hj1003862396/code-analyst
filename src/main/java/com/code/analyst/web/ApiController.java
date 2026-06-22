@@ -1,16 +1,15 @@
-package com.codedb.analyst.web;
+package com.code.analyst.web;
 
-import com.codedb.analyst.config.AppConfig;
-import com.codedb.analyst.config.ConfigManager;
-import com.codedb.analyst.llm.LlmService;
-import com.codedb.analyst.parser.DbOperation;
-import com.codedb.analyst.parser.JavaSourceParser;
-import com.codedb.analyst.parser.MethodCallInfo;
-import com.codedb.analyst.parser.SqlExtractor;
+import com.code.analyst.config.AppConfig;
+import com.code.analyst.config.ConfigManager;
+import com.code.analyst.llm.LlmService;
+import com.code.analyst.parser.DbOperation;
+import com.code.analyst.parser.JavaSourceParser;
+import com.code.analyst.parser.MethodCallInfo;
+import com.code.analyst.parser.SqlExtractor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -79,6 +78,22 @@ public class ApiController {
         List<DbOperation> dbOps = Collections.emptyList();
         if (root != null && !root.isEmpty()) {
             dbOps = getTransitiveDbOperations(root, className, methodName, new HashSet<>());
+            
+            // Extract source code and Javadoc remarks
+            Optional<Path> fileOpt = findJavaFileByFqName(root, className);
+            if (fileOpt.isPresent()) {
+                try {
+                    String sourceCode = sourceParser.getMethodSource(fileOpt.get().toString(), methodName);
+                    node.put("sourceCode", sourceCode);
+                    
+                    String javadoc = sourceParser.getMethodJavadoc(fileOpt.get().toString(), methodName);
+                    if (javadoc != null && !javadoc.trim().isEmpty()) {
+                        node.put("remarks", cleanJavadoc(javadoc));
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
         }
         node.put("dbOperations", dbOps);
         return ResponseEntity.ok(node);
@@ -156,6 +171,24 @@ public class ApiController {
                 node.put("methodName", method);
                 node.put("isMapper", isMapper);
                 node.put("dbOperations", dbOps);
+
+                // Extract Javadoc remarks and sourceCode
+                Optional<Path> targetFileOpt = findJavaFileByFqName(root, fullTargetClassName);
+                if (targetFileOpt.isPresent()) {
+                    try {
+                        String javadoc = sourceParser.getMethodJavadoc(targetFileOpt.get().toString(), method);
+                        if (javadoc != null && !javadoc.trim().isEmpty()) {
+                            node.put("remarks", cleanJavadoc(javadoc));
+                        }
+                        if (!isMapper) {
+                            String sourceCode = sourceParser.getMethodSource(targetFileOpt.get().toString(), method);
+                            node.put("sourceCode", sourceCode);
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+
                 result.add(node);
             }
         } catch (Exception e) {
@@ -464,6 +497,30 @@ public class ApiController {
       private String camelToSnake(String str) {
           if (str == null || str.isEmpty()) return str;
           return str.replaceAll("([a-z])([A-Z])", "$1_$2").toLowerCase();
+      }
+
+      private String cleanJavadoc(String comment) {
+          if (comment == null) return "";
+          String[] lines = comment.split("\r?\n");
+          StringBuilder sb = new StringBuilder();
+          for (String line : lines) {
+              String trimmed = line.trim();
+              if (trimmed.startsWith("/**")) {
+                  trimmed = trimmed.substring(3);
+              }
+              if (trimmed.endsWith("*/")) {
+                  trimmed = trimmed.substring(0, trimmed.length() - 2);
+              }
+              if (trimmed.startsWith("*")) {
+                  trimmed = trimmed.substring(1);
+              }
+              trimmed = trimmed.trim();
+              if (!trimmed.isEmpty()) {
+                  if (sb.length() > 0) sb.append("\n");
+                  sb.append(trimmed);
+              }
+          }
+          return sb.toString();
       }
 
       private Optional<Path> findImplementationBySearch(String rootPath, String interfaceSimpleName, String interfaceFqName) {

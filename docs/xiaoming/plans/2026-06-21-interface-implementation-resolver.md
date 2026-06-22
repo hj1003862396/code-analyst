@@ -21,7 +21,7 @@
 - [ ] **步骤 1：恢复 / 更新 JavaSourceParserTest 单元测试验证 Repository 被正确保留**
   修改 `src/test/java/com/codedb/analyst/parser/JavaSourceParserTest.java`：
   ```java
-  package com.codedb.analyst.parser;
+  package com.code.analyst.parser;
 
   import org.junit.jupiter.api.Test;
   import java.io.FileWriter;

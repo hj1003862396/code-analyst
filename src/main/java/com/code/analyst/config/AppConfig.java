@@ -1,4 +1,4 @@
-package com.codedb.analyst.config;
+package com.code.analyst.config;
 
 public class AppConfig {
     private String projectRoot;

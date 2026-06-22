@@ -49,7 +49,7 @@
   
   创建 `src/test/java/com/codedb/analyst/parser/JavaSourceParserTest.java`，内容如下：
   ```java
-  package com.codedb.analyst.parser;
+  package com.code.analyst.parser;
   
   import org.junit.jupiter.api.Test;
   import java.io.File;
@@ -129,12 +129,12 @@
   
   创建 `src/test/java/com/codedb/analyst/web/ApiControllerTest.java`：
   ```java
-  package com.codedb.analyst.web;
+  package com.code.analyst.web;
   
-  import com.codedb.analyst.config.AppConfig;
-  import com.codedb.analyst.config.ConfigManager;
-  import com.codedb.analyst.llm.LlmService;
-  import com.codedb.analyst.parser.JavaSourceParser;
+  import com.code.analyst.config.AppConfig;
+  import com.code.analyst.config.ConfigManager;
+  import com.code.analyst.llm.LlmService;
+  import com.code.analyst.parser.JavaSourceParser;
   import org.junit.jupiter.api.Test;
   import org.mockito.Mockito;
   import org.springframework.beans.factory.annotation.Autowired;
@@ -143,9 +143,7 @@
   import org.springframework.http.MediaType;
   import org.springframework.test.web.servlet.MockMvc;
   
-  import java.nio.file.Path;
   import java.util.Arrays;
-  import java.util.Optional;
   
   import static org.hamcrest.Matchers.containsString;
   import static org.mockito.ArgumentMatchers.anyString;
@@ -170,7 +168,7 @@
       private LlmService llmService;
   
       @MockBean
-      private com.codedb.analyst.parser.SqlExtractor sqlExtractor;
+      private com.code.analyst.parser.SqlExtractor sqlExtractor;
   
       @Test
       public void testExplainMethodNotFound() throws Exception {

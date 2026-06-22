@@ -30,50 +30,157 @@ createApp({
         const transformNode = (node) => {
             if (!node) return null;
 
-            const text = node.isMapper ? `💾 ${node.label}` : (node.label || node.text || '?');
             const isLoaded = loadedSet.has(node.id);
-            const hasApiChildren = node.children && node.children.length > 0;
-            const hasSql = node.isMapper && node.dbOperations && node.dbOperations.length > 0;
+            const isExpanded = !!node.expand;
 
             let children = [];
 
-            if (hasApiChildren) {
-                // 已通过 API 加载的子节点，递归转换
+            // 仅在已加载且处于展开状态时，才递归返回子节点
+            if (isLoaded && isExpanded && node.children && node.children.length > 0) {
                 children = node.children.map(c => transformNode(c));
-            } else if (hasSql) {
-                // Mapper 节点：直接使用 SQL 作为叶子节点
-                children = node.dbOperations.map((op, idx) => ({
-                    data: {
-                        text: op.sql || `[${op.operationType || 'SQL'}] ${op.tableName || ''}`,
-                        id: `${node.id}__sql__${idx}`,
-                        _isSql: true,
-                        expand: false
-                    },
-                    children: []
-                }));
-            } else if (!node.isMapper && !isLoaded) {
-                // 未加载的普通节点：添加占位子节点使其显示 + 按钮
-                children = [{
-                    data: {
-                        text: '···',
-                        id: `${node.id}__ph__`,
-                        _isPlaceholder: true
-                    },
-                    children: []
-                }];
             }
-            // 已加载但无子节点（空方法）：children = []，不显示 + 按钮
-
-            const expand = (node.expand !== undefined) ? !!node.expand : false;
 
             return {
                 data: {
-                    text,
+                    text: node.methodName || node.label || '?',
                     id: node.id,
-                    expand
+                    className: node.className,
+                    methodName: node.methodName,
+                    isMapper: node.isMapper,
+                    dbOperations: node.dbOperations,
+                    remarks: node.remarks,
+                    label: node.label
                 },
                 children
             };
+        };
+
+        const createCustomNodeDom = (node) => {
+            const data = node.nodeData.data;
+            if (!data) return null;
+
+            // 卡片主容器
+            const div = document.createElement('div');
+            div.className = 'mindmap-card';
+            if (data.isMapper) {
+                div.classList.add('is-mapper');
+            }
+            if (rawTreeData && data.id === rawTreeData.id) {
+                div.classList.add('is-root');
+            }
+
+            // 头部
+            const header = document.createElement('div');
+            header.className = 'card-header';
+            
+            const icon = document.createElement('span');
+            icon.className = 'card-icon';
+            icon.innerText = data.isMapper ? '💾' : '⚡';
+            
+            const title = document.createElement('span');
+            title.className = 'card-title';
+            title.innerText = data.methodName || data.text || '';
+
+            header.appendChild(icon);
+            header.appendChild(title);
+            div.appendChild(header);
+
+            // 主体
+            const body = document.createElement('div');
+            body.className = 'card-body';
+
+            // 接口备注 (说明)
+            if (data.remarks) {
+                const remarksContainer = document.createElement('div');
+                remarksContainer.className = 'card-remarks-container';
+                
+                const remarksTitle = document.createElement('div');
+                remarksTitle.className = 'remarks-title';
+                remarksTitle.innerText = '说明';
+                remarksContainer.appendChild(remarksTitle);
+
+                const remarksContent = document.createElement('div');
+                remarksContent.className = 'remarks-content';
+                remarksContent.innerText = data.remarks;
+                remarksContainer.appendChild(remarksContent);
+
+                body.appendChild(remarksContainer);
+            }
+
+            // SQL 语句展示 (仅 Mapper)
+            if (data.isMapper && data.dbOperations && data.dbOperations.length > 0) {
+                const sqlContainer = document.createElement('div');
+                sqlContainer.className = 'card-sql-container';
+
+                const sqlTitle = document.createElement('div');
+                sqlTitle.className = 'sql-title';
+                sqlTitle.innerText = 'SQL 语句';
+                sqlContainer.appendChild(sqlTitle);
+
+                data.dbOperations.forEach(op => {
+                    const sqlBox = document.createElement('div');
+                    sqlBox.className = 'sql-box';
+
+                    if (op.operationType) {
+                        const tag = document.createElement('span');
+                        tag.className = `sql-type-tag ${op.operationType.toLowerCase()}`;
+                        tag.innerText = op.operationType;
+                        sqlBox.appendChild(tag);
+                    }
+
+                    const code = document.createElement('code');
+                    code.className = 'sql-code';
+                    code.innerText = op.sql || `[${op.operationType || 'SQL'}] ${op.tableName || ''}`;
+                    sqlBox.appendChild(code);
+
+                    sqlContainer.appendChild(sqlBox);
+                });
+
+                body.appendChild(sqlContainer);
+            }
+
+            // 仅在有备注或有 SQL 时才渲染 body
+            const hasBody = data.remarks || (data.isMapper && data.dbOperations && data.dbOperations.length > 0);
+            if (hasBody) {
+                div.appendChild(body);
+            }
+
+            // 添加自定义贴边折叠/展开按钮
+            const isLoaded = loadedSet.has(data.id);
+            const rawNode = findNode(rawTreeData, data.id);
+            
+            let showBtn = false;
+            let btnText = '+';
+            
+            if (rawNode && !rawNode.isMapper) {
+                if (!isLoaded) {
+                    showBtn = true;
+                    btnText = '+';
+                } else if (rawNode.children && rawNode.children.length > 0) {
+                    showBtn = true;
+                    btnText = rawNode.expand ? '−' : '+';
+                }
+            }
+
+            if (showBtn) {
+                const btn = document.createElement('div');
+                btn.className = 'card-expand-btn';
+                btn.innerText = btnText;
+                
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (!isLoaded) {
+                        loadChildren(rawNode);
+                    } else {
+                        rawNode.expand = !rawNode.expand;
+                        rerender();
+                    }
+                });
+                
+                div.appendChild(btn);
+            }
+
+            return div;
         };
 
         // ─── 工具函数 ──────────────────────────────────────────────────────────────
@@ -204,20 +311,42 @@ createApp({
                         layout: 'logicalStructure',
                         theme: 'classic',
                         readonly: true,
-                        // 始终显示展开/收起 + 按钮，无需 hover
-                        alwaysShowExpandBtn: true
-                    });
-
-                    // 监听 expand_btn_click（点击 + 按钮）
-                    mindMapInstance.on('expand_btn_click', (nodeInstance) => {
-                        console.log('[Event] expand_btn_click fired');
-                        handleNodeClick(nodeInstance);
-                    });
-
-                    // 同时监听 node_click（点击节点本体），作为备用触发方式
-                    mindMapInstance.on('node_click', (nodeInstance) => {
-                        console.log('[Event] node_click fired');
-                        handleNodeClick(nodeInstance);
+                        alwaysShowExpandBtn: false, // 禁用默认的展开按钮
+                        isUseCustomNodeContent: true,
+                        customCreateNodeContent: (node) => {
+                            return createCustomNodeDom(node);
+                        },
+                        themeConfig: {
+                            paddingX: 0,
+                            paddingY: 0,
+                            root: {
+                                fillColor: 'transparent',
+                                borderColor: 'transparent',
+                                borderWidth: 0,
+                                active: {
+                                    fillColor: 'transparent',
+                                    borderColor: 'transparent'
+                                }
+                            },
+                            second: {
+                                fillColor: 'transparent',
+                                borderColor: 'transparent',
+                                borderWidth: 0,
+                                active: {
+                                    fillColor: 'transparent',
+                                    borderColor: 'transparent'
+                                }
+                            },
+                            node: {
+                                fillColor: 'transparent',
+                                borderColor: 'transparent',
+                                borderWidth: 0,
+                                active: {
+                                    fillColor: 'transparent',
+                                    borderColor: 'transparent'
+                                }
+                            }
+                        }
                     });
 
                     mindMapInstance.on('scale_change', (scale) => {

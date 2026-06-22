@@ -21,13 +21,14 @@
 - [ ] **步骤 1：编写测试类验证带 DTD 的 XML 解析，验证缓存与失效**
 
 创建新文件 [SqlExtractorTest.java](file:///Users/hanjie/IdeaProjects/code-analysis/src/test/java/com/codedb/analyst/parser/SqlExtractorTest.java) 并写入如下内容：
+
 ```java
-package com.codedb.analyst.parser;
+package com.code.analyst.parser;
 
 import org.junit.jupiter.api.Test;
 import java.io.File;
 import java.io.FileWriter;
-import java.nio.file.Files;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 public class SqlExtractorTest {
@@ -39,11 +40,11 @@ public class SqlExtractorTest {
 
         try (FileWriter writer = new FileWriter(tempFile)) {
             writer.write(
-                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-                "<!DOCTYPE mapper PUBLIC \"-//mybatis.org//DTD Mapper 3.0//EN\" \"http://mybatis.org/dtd/mybatis-3-0-mapper.dtd\">\n" +
-                "<mapper namespace=\"com.example.MockMapper\">\n" +
-                "    <select id=\"getUser\">SELECT * FROM t_user WHERE id = #{id}</select>\n" +
-                "</mapper>\n"
+                    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+                            "<!DOCTYPE mapper PUBLIC \"-//mybatis.org//DTD Mapper 3.0//EN\" \"http://mybatis.org/dtd/mybatis-3-0-mapper.dtd\">\n" +
+                            "<mapper namespace=\"com.example.MockMapper\">\n" +
+                            "    <select id=\"getUser\">SELECT * FROM t_user WHERE id = #{id}</select>\n" +
+                            "</mapper>\n"
             );
         }
 
@@ -59,11 +60,11 @@ public class SqlExtractorTest {
         // 测试修改文件后能够识别最新修改（缓存更新）
         try (FileWriter writer = new FileWriter(tempFile)) {
             writer.write(
-                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-                "<!DOCTYPE mapper PUBLIC \"-//mybatis.org//DTD Mapper 3.0//EN\" \"http://mybatis.org/dtd/mybatis-3-0-mapper.dtd\">\n" +
-                "<mapper namespace=\"com.example.MockMapper\">\n" +
-                "    <select id=\"getUser\">SELECT * FROM t_user_new WHERE id = #{id}</select>\n" +
-                "</mapper>\n"
+                    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+                            "<!DOCTYPE mapper PUBLIC \"-//mybatis.org//DTD Mapper 3.0//EN\" \"http://mybatis.org/dtd/mybatis-3-0-mapper.dtd\">\n" +
+                            "<mapper namespace=\"com.example.MockMapper\">\n" +
+                            "    <select id=\"getUser\">SELECT * FROM t_user_new WHERE id = #{id}</select>\n" +
+                            "</mapper>\n"
             );
         }
         // 人为修改最近修改时间确保其变化
@@ -88,12 +89,10 @@ public class SqlExtractorTest {
 3. 重写 `findSqlFromXml` 逻辑。
 
 替换内容：
-```java
-package com.codedb.analyst.parser;
 
-import net.sf.jsqlparser.parser.CCJSqlParserUtil;
-import net.sf.jsqlparser.statement.Statement;
-import net.sf.jsqlparser.util.TablesNamesFinder;
+```java
+package com.code.analyst.parser;
+
 import org.springframework.stereotype.Service;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -102,9 +101,6 @@ import org.w3c.dom.NodeList;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.File;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
@@ -140,7 +136,7 @@ public class SqlExtractor {
             DocumentBuilder builder = factory.newDocumentBuilder();
             // 解决 DTD 联网卡顿问题，跳过外部实体加载
             builder.setEntityResolver((publicId, systemId) -> new org.xml.sax.InputSource(new java.io.StringReader("")));
-            
+
             Document doc = builder.parse(file);
             doc.getDocumentElement().normalize();
 
@@ -181,46 +177,48 @@ public class SqlExtractor {
 - [ ] **步骤 1：在 ApiControllerTest.java 中编写新增的方法扫描与重构后的路径匹配测试**
 
 修改 [ApiControllerTest.java](file:///Users/hanjie/IdeaProjects/code-analysis/src/test/java/com/codedb/analyst/web/ApiControllerTest.java) 添加方法 `testFileIndexCache` 验证索引能正确命中，并且能在缓存失效重新初始化后再次加载：
+
 ```java
-    @Test
-    public void testFileIndexCache() throws Exception {
-        com.codedb.analyst.config.ConfigManager configManager = new com.codedb.analyst.config.ConfigManager();
-        com.codedb.analyst.config.AppConfig config = new com.codedb.analyst.config.AppConfig();
-        // 使用一个临时目录作为测试项目根目录
-        File tempDir = Files.createTempDirectory("test_project_root").toFile();
-        tempDir.deleteOnExit();
-        
-        File javaFile = new File(tempDir, "OrderService.java");
-        javaFile.createNewFile();
-        javaFile.deleteOnExit();
-        
-        File xmlFile = new File(tempDir, "OrderMapper.xml");
-        xmlFile.createNewFile();
-        xmlFile.deleteOnExit();
 
-        config.setProjectRoot(tempDir.getAbsolutePath());
-        configManager.saveConfig(config);
+@Test
+public void testFileIndexCache() throws Exception {
+    com.code.analyst.config.ConfigManager configManager = new com.code.analyst.config.ConfigManager();
+    com.code.analyst.config.AppConfig config = new com.code.analyst.config.AppConfig();
+    // 使用一个临时目录作为测试项目根目录
+    File tempDir = Files.createTempDirectory("test_project_root").toFile();
+    tempDir.deleteOnExit();
 
-        ApiController controller = new ApiController(configManager, new com.codedb.analyst.parser.JavaSourceParser(), new com.codedb.analyst.parser.SqlExtractor(), null);
+    File javaFile = new File(tempDir, "OrderService.java");
+    javaFile.createNewFile();
+    javaFile.deleteOnExit();
 
-        // 利用反射调用 ensureIndexInitialized
-        java.lang.reflect.Method ensureIndex = ApiController.class.getDeclaredMethod("ensureIndexInitialized", String.class);
-        ensureIndex.setAccessible(true);
-        ensureIndex.invoke(controller, tempDir.getAbsolutePath());
+    File xmlFile = new File(tempDir, "OrderMapper.xml");
+    xmlFile.createNewFile();
+    xmlFile.deleteOnExit();
 
-        // 利用反射读取 javaFileByNameCache 和 xmlFileByNameCache
-        java.lang.reflect.Field javaCacheField = ApiController.class.getDeclaredField("javaFileByNameCache");
-        javaCacheField.setAccessible(true);
-        java.util.Map<String, java.util.List<java.nio.file.Path>> javaCache = (java.util.Map<String, java.util.List<java.nio.file.Path>>) javaCacheField.get(controller);
+    config.setProjectRoot(tempDir.getAbsolutePath());
+    configManager.saveConfig(config);
 
-        java.lang.reflect.Field xmlCacheField = ApiController.class.getDeclaredField("xmlFileByNameCache");
-        xmlCacheField.setAccessible(true);
-        java.util.Map<String, java.nio.file.Path> xmlCache = (java.util.Map<String, java.nio.file.Path>) xmlCacheField.get(controller);
+    ApiController controller = new ApiController(configManager, new com.code.analyst.parser.JavaSourceParser(), new com.code.analyst.parser.SqlExtractor(), null);
 
-        assertTrue(javaCache.containsKey("OrderService"));
-        assertTrue(xmlCache.containsKey("OrderMapper.xml"));
-        assertEquals(javaFile.getAbsolutePath(), javaCache.get("OrderService").get(0).toAbsolutePath().toString());
-    }
+    // 利用反射调用 ensureIndexInitialized
+    java.lang.reflect.Method ensureIndex = ApiController.class.getDeclaredMethod("ensureIndexInitialized", String.class);
+    ensureIndex.setAccessible(true);
+    ensureIndex.invoke(controller, tempDir.getAbsolutePath());
+
+    // 利用反射读取 javaFileByNameCache 和 xmlFileByNameCache
+    java.lang.reflect.Field javaCacheField = ApiController.class.getDeclaredField("javaFileByNameCache");
+    javaCacheField.setAccessible(true);
+    java.util.Map<String, java.util.List<java.nio.file.Path>> javaCache = (java.util.Map<String, java.util.List<java.nio.file.Path>>) javaCacheField.get(controller);
+
+    java.lang.reflect.Field xmlCacheField = ApiController.class.getDeclaredField("xmlFileByNameCache");
+    xmlCacheField.setAccessible(true);
+    java.util.Map<String, java.nio.file.Path> xmlCache = (java.util.Map<String, java.nio.file.Path>) xmlCacheField.get(controller);
+
+    assertTrue(javaCache.containsKey("OrderService"));
+    assertTrue(xmlCache.containsKey("OrderMapper.xml"));
+    assertEquals(javaFile.getAbsolutePath(), javaCache.get("OrderService").get(0).toAbsolutePath().toString());
+}
 ```
 
 - [ ] **步骤 2：运行测试验证其失败**

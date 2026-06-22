@@ -1,4 +1,4 @@
-package com.codedb.analyst.parser;
+package com.code.analyst.parser;
 
 public class MethodCallInfo {
     private String objectName;

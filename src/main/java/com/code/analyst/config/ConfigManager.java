@@ -1,4 +1,4 @@
-package com.codedb.analyst.config;
+package com.code.analyst.config;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;

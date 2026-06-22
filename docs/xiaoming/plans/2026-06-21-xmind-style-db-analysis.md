@@ -22,7 +22,7 @@
 - [ ] **步骤 1：为 DbOperation 增加 SQL 结构化属性、构造函数以及 Getter/Setter 方法**
   在 `DbOperation` 中加入 `columns`, `whereCondition`, `sql` 字段：
   ```java
-  package com.codedb.analyst.parser;
+  package com.code.analyst.parser;
 
   import java.util.ArrayList;
   import java.util.List;
@@ -274,14 +274,14 @@
 - [ ] **步骤 1：增加递归函数 `getTransitiveDbOperations`，实现 DFS 获取节点及其所有下游的所有去重物理表操作**
   在 `ApiController.java` 类体中加入以下辅助和核心方法：
   ```java
-      private List<com.codedb.analyst.parser.DbOperation> getTransitiveDbOperations(String root, String className, String methodName, Set<String> visited) {
+      private List<com.code.analyst.parser.DbOperation> getTransitiveDbOperations(String root, String className, String methodName, Set<String> visited) {
           String key = className + "#" + methodName;
           if (visited.contains(key)) {
               return Collections.emptyList();
           }
           visited.add(key);
 
-          List<com.codedb.analyst.parser.DbOperation> ops = new ArrayList<>();
+          List<com.code.analyst.parser.DbOperation> ops = new ArrayList<>();
           
           String simpleName = className.substring(className.lastIndexOf('.') + 1);
           Optional<Path> fileOpt = findJavaFile(root, simpleName);
@@ -290,8 +290,8 @@
           }
 
           try {
-              List<com.codedb.analyst.parser.MethodCallInfo> calls = sourceParser.parseMethodCalls(fileOpt.get().toString(), methodName);
-              for (com.codedb.analyst.parser.MethodCallInfo call : calls) {
+              List<com.code.analyst.parser.MethodCallInfo> calls = sourceParser.parseMethodCalls(fileOpt.get().toString(), methodName);
+              for (com.code.analyst.parser.MethodCallInfo call : calls) {
                   String type = call.getObjectType();
                   String method = call.getMethodName();
                   
@@ -306,7 +306,7 @@
                   }
 
                   if (isMapper) {
-                      List<com.codedb.analyst.parser.DbOperation> dbOps = new ArrayList<>();
+                      List<com.code.analyst.parser.DbOperation> dbOps = new ArrayList<>();
                       Optional<Path> xmlOpt = findXmlFile(root, type);
                       if (xmlOpt.isPresent()) {
                           String sql = sqlExtractor.findSqlFromXml(xmlOpt.get().toString(), method);
@@ -320,7 +320,7 @@
                           else if (method.contains("insert")) opType = "INSERT";
                           else if (method.contains("update")) opType = "UPDATE";
                           else if (method.contains("delete")) opType = "DELETE";
-                          dbOps = List.of(new com.codedb.analyst.parser.DbOperation(tableName, opType, Collections.emptyList(), "", ""));
+                          dbOps = List.of(new com.code.analyst.parser.DbOperation(tableName, opType, Collections.emptyList(), "", ""));
                       }
                       ops.addAll(dbOps);
                   } else {
@@ -341,8 +341,8 @@
           }
 
           // 按字段属性去重
-          Map<String, com.codedb.analyst.parser.DbOperation> dedup = new HashMap<>();
-          for (com.codedb.analyst.parser.DbOperation op : ops) {
+          Map<String, com.code.analyst.parser.DbOperation> dedup = new HashMap<>();
+          for (com.code.analyst.parser.DbOperation op : ops) {
               String opKey = op.getTableName() + "#" + op.getOperationType() + "#" + String.join(",", op.getColumns()) + "#" + op.getWhereCondition();
               dedup.put(opKey, op);
           }
@@ -367,7 +367,7 @@
           
           AppConfig config = configManager.getConfig();
           String root = config.getProjectRoot();
-          List<com.codedb.analyst.parser.DbOperation> dbOps = Collections.emptyList();
+          List<com.code.analyst.parser.DbOperation> dbOps = Collections.emptyList();
           if (root != null && !root.isEmpty()) {
               dbOps = getTransitiveDbOperations(root, className, methodName, new HashSet<>());
           }
@@ -397,8 +397,8 @@
               }
 
               String filePath = fileOpt.get().toString();
-              List<com.codedb.analyst.parser.MethodCallInfo> calls = sourceParser.parseMethodCalls(filePath, methodName);
-              for (com.codedb.analyst.parser.MethodCallInfo call : calls) {
+              List<com.code.analyst.parser.MethodCallInfo> calls = sourceParser.parseMethodCalls(filePath, methodName);
+              for (com.code.analyst.parser.MethodCallInfo call : calls) {
                   Map<String, Object> node = new HashMap<>();
                   String type = call.getObjectType();
                   String method = call.getMethodName();
@@ -413,7 +413,7 @@
                       }
                   }
 
-                  List<com.codedb.analyst.parser.DbOperation> dbOps = new ArrayList<>();
+                  List<com.code.analyst.parser.DbOperation> dbOps = new ArrayList<>();
                   if (isMapper) {
                       Optional<Path> xmlOpt = findXmlFile(root, type);
                       if (xmlOpt.isPresent()) {
@@ -428,7 +428,7 @@
                           else if (method.contains("insert")) opType = "INSERT";
                           else if (method.contains("update")) opType = "UPDATE";
                           else if (method.contains("delete")) opType = "DELETE";
-                          dbOps = List.of(new com.codedb.analyst.parser.DbOperation(tableName, opType, Collections.emptyList(), "", ""));
+                          dbOps = List.of(new com.code.analyst.parser.DbOperation(tableName, opType, Collections.emptyList(), "", ""));
                       }
                   } else {
                       String fullTargetClassName = resolveFullClassName(root, type);

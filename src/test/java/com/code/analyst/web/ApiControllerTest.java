@@ -1,11 +1,12 @@
-package com.codedb.analyst.web;
+package com.code.analyst.web;
 
+import com.code.analyst.CodeAnalystApplication;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest(classes = com.codedb.analyst.CodeDbAnalystApplication.class)
+@SpringBootTest(classes = CodeAnalystApplication.class)
 public class ApiControllerTest {
     @Test
     public void contextLoads() {
@@ -14,13 +15,13 @@ public class ApiControllerTest {
 
     @Test
     public void testFindJavaFileWithDuplicates() throws Exception {
-        com.codedb.analyst.config.ConfigManager configManager = new com.codedb.analyst.config.ConfigManager();
-        com.codedb.analyst.config.AppConfig config = new com.codedb.analyst.config.AppConfig();
+        com.code.analyst.config.ConfigManager configManager = new com.code.analyst.config.ConfigManager();
+        com.code.analyst.config.AppConfig config = new com.code.analyst.config.AppConfig();
         config.setProjectRoot("/Users/hanjie/IdeaProjects/charging-ionchi");
         configManager.saveConfig(config);
 
-        com.codedb.analyst.parser.JavaSourceParser parser = new com.codedb.analyst.parser.JavaSourceParser();
-        com.codedb.analyst.parser.SqlExtractor extractor = new com.codedb.analyst.parser.SqlExtractor();
+        com.code.analyst.parser.JavaSourceParser parser = new com.code.analyst.parser.JavaSourceParser();
+        com.code.analyst.parser.SqlExtractor extractor = new com.code.analyst.parser.SqlExtractor();
         ApiController controller = new ApiController(configManager, parser, extractor, null);
 
         String controllerPath = "/Users/hanjie/IdeaProjects/charging-ionchi/omp-trading/omp-marketing/omp-marketing-server/src/main/java/com/omp/marketing/intf/web/ShortLinkController.java";
@@ -42,8 +43,8 @@ public class ApiControllerTest {
 
     @Test
     public void testFileIndexCache() throws Exception {
-        com.codedb.analyst.config.ConfigManager configManager = new com.codedb.analyst.config.ConfigManager();
-        com.codedb.analyst.config.AppConfig config = new com.codedb.analyst.config.AppConfig();
+        com.code.analyst.config.ConfigManager configManager = new com.code.analyst.config.ConfigManager();
+        com.code.analyst.config.AppConfig config = new com.code.analyst.config.AppConfig();
         // Use a temporary directory as the mock project root
         java.io.File tempDir = java.nio.file.Files.createTempDirectory("test_project_root").toFile();
         tempDir.deleteOnExit();
@@ -59,7 +60,7 @@ public class ApiControllerTest {
         config.setProjectRoot(tempDir.getAbsolutePath());
         configManager.saveConfig(config);
 
-        ApiController controller = new ApiController(configManager, new com.codedb.analyst.parser.JavaSourceParser(), new com.codedb.analyst.parser.SqlExtractor(), null);
+        ApiController controller = new ApiController(configManager, new com.code.analyst.parser.JavaSourceParser(), new com.code.analyst.parser.SqlExtractor(), null);
 
         // Invoke ensureIndexInitialized via reflection
         java.lang.reflect.Method ensureIndex = ApiController.class.getDeclaredMethod("ensureIndexInitialized", String.class);
@@ -82,13 +83,13 @@ public class ApiControllerTest {
 
     @Test
     public void testExpandTree() throws Exception {
-        com.codedb.analyst.config.ConfigManager configManager = new com.codedb.analyst.config.ConfigManager();
-        com.codedb.analyst.config.AppConfig config = new com.codedb.analyst.config.AppConfig();
+        com.code.analyst.config.ConfigManager configManager = new com.code.analyst.config.ConfigManager();
+        com.code.analyst.config.AppConfig config = new com.code.analyst.config.AppConfig();
         config.setProjectRoot("/Users/hanjie/IdeaProjects/charging-ionchi");
         configManager.saveConfig(config);
 
-        com.codedb.analyst.parser.JavaSourceParser parser = new com.codedb.analyst.parser.JavaSourceParser();
-        com.codedb.analyst.parser.SqlExtractor extractor = new com.codedb.analyst.parser.SqlExtractor();
+        com.code.analyst.parser.JavaSourceParser parser = new com.code.analyst.parser.JavaSourceParser();
+        com.code.analyst.parser.SqlExtractor extractor = new com.code.analyst.parser.SqlExtractor();
         ApiController controller = new ApiController(configManager, parser, extractor, null);
 
         java.util.Map<String, String> req = new java.util.HashMap<>();
@@ -105,12 +106,12 @@ public class ApiControllerTest {
 
     @Test
     public void testFindJavaFileForRepoImpl() throws Exception {
-        com.codedb.analyst.config.ConfigManager configManager = new com.codedb.analyst.config.ConfigManager();
-        com.codedb.analyst.config.AppConfig config = new com.codedb.analyst.config.AppConfig();
+        com.code.analyst.config.ConfigManager configManager = new com.code.analyst.config.ConfigManager();
+        com.code.analyst.config.AppConfig config = new com.code.analyst.config.AppConfig();
         config.setProjectRoot("/Users/hanjie/IdeaProjects/charging-ionchi");
         configManager.saveConfig(config);
 
-        ApiController controller = new ApiController(configManager, new com.codedb.analyst.parser.JavaSourceParser(), new com.codedb.analyst.parser.SqlExtractor(), null);
+        ApiController controller = new ApiController(configManager, new com.code.analyst.parser.JavaSourceParser(), new com.code.analyst.parser.SqlExtractor(), null);
 
         java.lang.reflect.Method findJavaFileMethod = ApiController.class.getDeclaredMethod("findJavaFile", String.class, String.class, String.class);
         findJavaFileMethod.setAccessible(true);
@@ -127,12 +128,12 @@ public class ApiControllerTest {
 
     @Test
     public void testFindJavaFileForRepoImplWithServiceRef() throws Exception {
-        com.codedb.analyst.config.ConfigManager configManager = new com.codedb.analyst.config.ConfigManager();
-        com.codedb.analyst.config.AppConfig config = new com.codedb.analyst.config.AppConfig();
+        com.code.analyst.config.ConfigManager configManager = new com.code.analyst.config.ConfigManager();
+        com.code.analyst.config.AppConfig config = new com.code.analyst.config.AppConfig();
         config.setProjectRoot("/Users/hanjie/IdeaProjects/charging-ionchi");
         configManager.saveConfig(config);
 
-        ApiController controller = new ApiController(configManager, new com.codedb.analyst.parser.JavaSourceParser(), new com.codedb.analyst.parser.SqlExtractor(), null);
+        ApiController controller = new ApiController(configManager, new com.code.analyst.parser.JavaSourceParser(), new com.code.analyst.parser.SqlExtractor(), null);
 
         java.lang.reflect.Method findJavaFileMethod = ApiController.class.getDeclaredMethod("findJavaFile", String.class, String.class, String.class);
         findJavaFileMethod.setAccessible(true);
@@ -151,12 +152,12 @@ public class ApiControllerTest {
 
     @Test
     public void testGetTableNameFromMapperAnnotation() throws Exception {
-        com.codedb.analyst.config.ConfigManager configManager = new com.codedb.analyst.config.ConfigManager();
-        com.codedb.analyst.config.AppConfig config = new com.codedb.analyst.config.AppConfig();
+        com.code.analyst.config.ConfigManager configManager = new com.code.analyst.config.ConfigManager();
+        com.code.analyst.config.AppConfig config = new com.code.analyst.config.AppConfig();
         config.setProjectRoot("/Users/hanjie/IdeaProjects/charging-ionchi");
         configManager.saveConfig(config);
         
-        ApiController controller = new ApiController(configManager, new com.codedb.analyst.parser.JavaSourceParser(), new com.codedb.analyst.parser.SqlExtractor(), null);
+        ApiController controller = new ApiController(configManager, new com.code.analyst.parser.JavaSourceParser(), new com.code.analyst.parser.SqlExtractor(), null);
         
         java.lang.reflect.Method getTableName = ApiController.class.getDeclaredMethod("getTableNameFromMapper", String.class, String.class);
         getTableName.setAccessible(true);
@@ -171,7 +172,7 @@ public class ApiControllerTest {
         java.lang.reflect.Method getFallback = ApiController.class.getDeclaredMethod("getFallbackDbOps", String.class, String.class, String.class, String.class);
         getFallback.setAccessible(true);
         
-        java.util.List<com.codedb.analyst.parser.DbOperation> dbOps = (java.util.List<com.codedb.analyst.parser.DbOperation>) getFallback.invoke(
+        java.util.List<com.code.analyst.parser.DbOperation> dbOps = (java.util.List<com.code.analyst.parser.DbOperation>) getFallback.invoke(
             controller,
             "/Users/hanjie/IdeaProjects/charging-ionchi",
             "ShortLinkMapper",

@@ -19,7 +19,7 @@
 - [ ] **步骤 1：创建单元测试验证过滤逻辑**
   创建测试文件 `src/test/java/com/codedb/analyst/parser/JavaSourceParserTest.java`：
   ```java
-  package com.codedb.analyst.parser;
+  package com.code.analyst.parser;
 
   import org.junit.jupiter.api.Test;
   import java.io.FileWriter;

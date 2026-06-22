@@ -1,4 +1,4 @@
-package com.codedb.analyst.parser;
+package com.code.analyst.parser;
 
 import org.junit.jupiter.api.Test;
 import java.io.FileWriter;

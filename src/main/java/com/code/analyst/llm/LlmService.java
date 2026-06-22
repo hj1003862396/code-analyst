@@ -1,7 +1,7 @@
-package com.codedb.analyst.llm;
+package com.code.analyst.llm;
 
-import com.codedb.analyst.config.AppConfig;
-import com.codedb.analyst.config.ConfigManager;
+import com.code.analyst.config.AppConfig;
+import com.code.analyst.config.ConfigManager;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;

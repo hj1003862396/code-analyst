@@ -1,4 +1,4 @@
-package com.codedb.analyst.parser;
+package com.code.analyst.parser;
 
 import java.util.ArrayList;
 import java.util.List;

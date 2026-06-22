@@ -1,4 +1,4 @@
-package com.codedb.analyst.parser;
+package com.code.analyst.parser;
 
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
@@ -71,6 +71,30 @@ public class JavaSourceParser {
         if (objectName == null) return false;
         String lowerName = objectName.toLowerCase();
         
+        // 过滤常见的 getter / setter 方法
+        if (methodName.startsWith("get") && methodName.length() > 3 && Character.isUpperCase(methodName.charAt(3))) {
+            return true;
+        }
+        if (methodName.startsWith("set") && methodName.length() > 3 && Character.isUpperCase(methodName.charAt(3))) {
+            return true;
+        }
+        if (methodName.startsWith("is") && methodName.length() > 2 && Character.isUpperCase(methodName.charAt(2))) {
+            return true;
+        }
+
+        // 过滤常见的 Stream / 集合 / 辅助方法
+        if (methodName.equals("map") || methodName.equals("collect") || methodName.equals("filter") 
+                || methodName.equals("forEach") || methodName.equals("stream") || methodName.equals("flatMap") 
+                || methodName.equals("reduce") || methodName.equals("orElse") || methodName.equals("orElseGet") 
+                || methodName.equals("orElseThrow") || methodName.equals("isPresent") || methodName.equals("ifPresent")
+                || methodName.equals("get") || methodName.equals("set") || methodName.equals("add") 
+                || methodName.equals("put") || methodName.equals("size") || methodName.equals("isEmpty")
+                || methodName.equals("equals") || methodName.equals("hashCode") || methodName.equals("toString")
+                || methodName.equals("containsKey") || methodName.equals("containsValue") || methodName.equals("clear")
+                || methodName.equals("remove") || methodName.equals("build") || methodName.equals("builder")) {
+            return true;
+        }
+
         // 过滤日志和标准流
         if (lowerName.equals("log") || lowerName.equals("logger") || lowerName.equals("system.out") || lowerName.equals("system.err") || lowerName.equals("out") || lowerName.equals("err")) {
             return true;
@@ -114,6 +138,16 @@ public class JavaSourceParser {
                 .filter(m -> m.getNameAsString().equals(targetMethodName))
                 .findFirst()
                 .map(MethodDeclaration::toString)
+                .orElse("");
+    }
+
+    public String getMethodJavadoc(String filePath, String targetMethodName) throws FileNotFoundException {
+        CompilationUnit cu = StaticJavaParser.parse(new File(filePath));
+        return cu.findAll(MethodDeclaration.class).stream()
+                .filter(m -> m.getNameAsString().equals(targetMethodName))
+                .findFirst()
+                .flatMap(MethodDeclaration::getComment)
+                .map(com.github.javaparser.ast.comments.Comment::getContent)
                 .orElse("");
     }
 
