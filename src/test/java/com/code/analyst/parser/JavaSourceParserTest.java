@@ -21,12 +21,15 @@ public class JavaSourceParserTest {
                 "    private OrderEntity orderEntity;\n" +
                 "    private BusinessService businessService;\n" +
                 "    private ShortLinkRepo shortLinkRepo;\n" +
+                "    private LockClient lockClient;\n" +
                 "    public void doSomething() {\n" +
                 "        userDto.getId();\n" +
                 "        orderEntity.save();\n" +
                 "        businessService.process();\n" +
                 "        shortLinkRepo.selectById(1L);\n" +
                 "        String.format(\"abc\");\n" +
+                "        lockClient.lock();\n" +
+                "        lockClient.unlock();\n" +
                 "    }\n" +
                 "}\n"
             );
@@ -39,6 +42,9 @@ public class JavaSourceParserTest {
         boolean hasRepo = calls.stream().anyMatch(c -> c.getObjectName().equals("shortLinkRepo") && c.getMethodName().equals("selectById"));
         assertTrue(hasService, "Should contain businessService.process");
         assertTrue(hasRepo, "Should contain shortLinkRepo.selectById");
+        
+        boolean hasLock = calls.stream().anyMatch(c -> c.getMethodName().equals("lock") || c.getMethodName().equals("unlock"));
+        assertFalse(hasLock, "Should not contain lock or unlock calls");
     }
 
     @Test

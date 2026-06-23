@@ -143,6 +143,10 @@ public class JavaSourceParser {
     }
 
     private boolean isIgnoredCall(String objectName, String objectType, String methodName) {
+        if ("Unknown".equals(objectType)) {
+            return true;
+        }
+        
         if (objectName == null) return false;
         String lowerName = objectName.toLowerCase();
         
@@ -176,7 +180,8 @@ public class JavaSourceParser {
                 || methodName.equals("floatValue") || methodName.equals("shortValue") || methodName.equals("byteValue")
                 || methodName.equals("booleanValue") || methodName.equals("compareTo") || methodName.equals("equalsIgnoreCase")
                 || methodName.equals("append") || methodName.equals("valueOf") || methodName.equals("values")
-                || methodName.equals("next") || methodName.equals("hasNext") || methodName.equals("asString")) {
+                || methodName.equals("next") || methodName.equals("hasNext") || methodName.equals("asString")
+                || methodName.equals("lock") || methodName.equals("unlock")) {
             return true;
         }
 

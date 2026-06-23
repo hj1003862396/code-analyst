@@ -582,12 +582,26 @@ public class ApiController {
                   if (!isInterface) {
                       return fullTargetClassName;
                   }
-                  // 如果是 Feign 客户端接口（由 Spring 动态代理生成），直接返回
+                  // 如果是 Feign 客户端接口（由 Spring 动态代理生成），尝试寻找本地实现类
                   boolean isFeign = cu.findAll(com.github.javaparser.ast.body.ClassOrInterfaceDeclaration.class).stream()
                           .filter(com.github.javaparser.ast.body.ClassOrInterfaceDeclaration::isInterface)
                           .flatMap(cid -> cid.getAnnotations().stream())
                           .anyMatch(ann -> ann.getNameAsString().equals("FeignClient"));
                   if (isFeign) {
+                      // 1. 启发式命名通道 (直接寻找 *Impl)
+                      String implClass = type + "Impl";
+                      Optional<Path> implPath = findJavaFile(root, implClass, fullTargetClassName);
+                      if (implPath.isPresent()) {
+                          return resolveFullClassName(root, implClass, implPath.get().toString());
+                      }
+
+                      // 2. 文本特征预过滤扫描通道
+                      Optional<Path> searchImplPath = findImplementationBySearch(root, type, fullTargetClassName);
+                      if (searchImplPath.isPresent()) {
+                          String searchImplClass = searchImplPath.get().getFileName().toString().replace(".java", "");
+                          return resolveFullClassName(root, searchImplClass, searchImplPath.get().toString());
+                      }
+
                       return fullTargetClassName;
                   }
               } catch (Exception ignored) {}

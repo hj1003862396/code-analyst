@@ -183,4 +183,25 @@ public class ApiControllerTest {
         assertEquals("t_marketing_short_link", dbOps.get(0).getTableName());
         assertEquals("SELECT * FROM t_marketing_short_link WHERE id = ?", dbOps.get(0).getSql());
     }
+
+    @Test
+    public void testResolveFeignClientImplementation() throws Exception {
+        com.code.analyst.config.ConfigManager configManager = new com.code.analyst.config.ConfigManager();
+        com.code.analyst.config.AppConfig config = new com.code.analyst.config.AppConfig();
+        config.setProjectRoot("/Users/hanjie/IdeaProjects/charging-ionchi");
+        configManager.saveConfig(config);
+
+        ApiController controller = new ApiController(configManager, new com.code.analyst.parser.JavaSourceParser(), new com.code.analyst.parser.SqlExtractor(), null);
+
+        java.lang.reflect.Method resolveImplementation = ApiController.class.getDeclaredMethod("resolveImplementation", String.class, String.class, String.class);
+        resolveImplementation.setAccessible(true);
+
+        String resolved = (String) resolveImplementation.invoke(
+            controller, 
+            "/Users/hanjie/IdeaProjects/charging-ionchi", 
+            "InvoiceRpcFeign", 
+            "com.omp.finance.api.invoice.InvoiceRpcFeign"
+        );
+        assertEquals("com.omp.finance.intf.rpc.invoice.InvoiceRpcController", resolved);
+    }
 }

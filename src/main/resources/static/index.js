@@ -1,7 +1,273 @@
-import MindMap from './lib/simple-mind-map/simpleMindMap.esm.min.js';
-
 const { createApp, ref, nextTick } = Vue;
 
+// ─── G6 自定义 DOM 节点注册 ──────────────────────────────────────────────────
+const createNodeHtml = (cfg) => {
+    const dotIdx = cfg.className ? cfg.className.lastIndexOf('.') : -1;
+    const shortName = dotIdx !== -1 ? cfg.className.substring(dotIdx + 1) : cfg.className;
+    
+    let headerText = '⚡ Service 方法';
+    if (cfg.isRoot) {
+        headerText = '🎯 入口方法';
+    } else if (cfg.isMapper) {
+        headerText = '💾 Mapper 接口';
+    }
+
+    let cardClass = 'mindmap-card';
+    if (cfg.isMapper) {
+        cardClass += ' is-mapper';
+    } else if (cfg.isRoot) {
+        cardClass += ' is-root';
+    } else {
+        cardClass += ' is-service';
+    }
+
+    let remarksHtml = '';
+    if (cfg.remarks) {
+        remarksHtml = `
+            <div class="card-row">
+                <span class="row-label">简介</span>
+                <span class="row-badge" title="${cfg.remarks}">${cfg.remarks}</span>
+            </div>
+        `;
+    }
+
+    let sqlHtml = '';
+    if (cfg.isMapper && cfg.dbOperations && cfg.dbOperations.length > 0) {
+        let opHtmls = '';
+        cfg.dbOperations.forEach(op => {
+            const opTypeClass = op.operationType ? op.operationType.toLowerCase() : 'sql';
+            opHtmls += `
+                <div class="sql-box">
+                    <span class="sql-type-tag ${opTypeClass}">${op.operationType || 'SQL'}</span>
+                    <code class="sql-code">${op.sql || '[' + (op.operationType || 'SQL') + '] ' + (op.tableName || '')}</code>
+                </div>
+            `;
+        });
+        sqlHtml = `
+            <div class="card-sql-container">
+                <div class="sql-title">SQL 语句</div>
+                ${opHtmls}
+            </div>
+        `;
+    }
+
+    const hasBody = cfg.isMapper && cfg.dbOperations && cfg.dbOperations.length > 0;
+    const bodyHtml = hasBody ? `<div class="card-body">${sqlHtml}</div>` : '';
+
+    let btnHtml = '';
+    if (!cfg.isMapper) {
+        const btnText = cfg.collapsed ? '+' : '−';
+        btnHtml = `<div class="card-expand-btn" onclick="window.handleNodeExpandClick('${cfg.id}', event)">${btnText}</div>`;
+    }
+    return `
+        <div class="mindmap-card-wrapper" onmousedown="window.handleNodeDragStart('${cfg.id}', event)">
+            <div class="${cardClass}">
+                <div class="card-delete-btn" onclick="window.handleNodeDeleteClick('${cfg.id}', event)">✖</div>
+                <div class="card-header-type">
+                    <span class="header-indicator"></span>
+                    <span class="header-text">${headerText}</span>
+                </div>
+                ${remarksHtml}
+                <div class="card-row">
+                    <span class="row-label">类名</span>
+                    <span class="row-badge" title="${cfg.className || ''}">${shortName || ''}</span>
+                </div>
+                <div class="card-row">
+                    <span class="row-label">方法名</span>
+                    <span class="row-badge">${cfg.methodName || ''}</span>
+                </div>
+                ${bodyHtml}
+            </div>
+            ${btnHtml}
+        </div>
+    `;
+};
+
+G6.registerNode('custom-node', {
+    draw(cfg, group) {
+        const hasBody = cfg.isMapper && cfg.dbOperations && cfg.dbOperations.length > 0;
+        const height = hasBody ? 240 : (cfg.remarks ? 145 : 120);
+        cfg.size = [300, height];
+        
+        return group.addShape('dom', {
+            attrs: {
+                x: -150,
+                y: -height / 2,
+                width: 300,
+                height: height,
+                html: createNodeHtml(cfg)
+            },
+            name: 'dom-node-keyshape',
+            draggable: true
+        });
+    },
+    getAnchorPoints(cfg) {
+        return [
+            [0, 0.5], // 左侧中心
+            [1, 0.5]  // 右侧中心
+        ];
+    }
+});
+
+const parsePathPoints = (path) => {
+    let points = [];
+    if (Array.isArray(path)) {
+        points = path.map(segment => ({ x: segment[1], y: segment[2] }));
+    } else if (typeof path === 'string') {
+        const commands = path.match(/[a-zA-Z][^a-zA-Z]*/g) || [];
+        commands.forEach(cmd => {
+            const type = cmd[0];
+            const args = cmd.substring(1).trim().split(/[\s,]+/).map(parseFloat).filter(n => !isNaN(n));
+            if (type === 'M' || type === 'L') {
+                if (args.length >= 2) {
+                    points.push({ x: args[0], y: args[1] });
+                }
+            } else if (type === 'Q') {
+                if (args.length >= 4) {
+                    if (points.length > 0) {
+                        points[points.length - 1] = { x: args[0], y: args[1] };
+                    }
+                    points.push({ x: args[2], y: args[3] });
+                }
+            } else if (type === 'A') {
+                if (args.length >= 7) {
+                    if (points.length > 0) {
+                        let isIncomingVertical = true;
+                        if (points.length >= 2) {
+                            const pLast = points[points.length - 1];
+                            const pPrev = points[points.length - 2];
+                            isIncomingVertical = Math.abs(pLast.x - pPrev.x) < 2;
+                        }
+                        const pLast = points[points.length - 1];
+                        let corner;
+                        if (isIncomingVertical) {
+                            corner = { x: pLast.x, y: args[6] };
+                        } else {
+                            corner = { x: args[5], y: pLast.y };
+                        }
+                        points[points.length - 1] = corner;
+                    }
+                    points.push({ x: args[5], y: args[6] });
+                }
+            }
+        });
+
+        // 过滤掉距离过近的控制点（弧线的起点和终点通常相距 < 15px），只留下主干拐点
+        const filtered = [];
+        points.forEach(p => {
+            if (filtered.length === 0) {
+                filtered.push(p);
+            } else {
+                const last = filtered[filtered.length - 1];
+                const dist = Math.sqrt((p.x - last.x) ** 2 + (p.y - last.y) ** 2);
+                if (dist >= 15) {
+                    filtered.push(p);
+                }
+            }
+        });
+        points = filtered;
+    }
+    return points;
+};
+
+G6.registerEdge('custom-polyline', {
+    afterDraw(cfg, group) {
+        const keyShape = group.get('children')[0];
+        const path = keyShape.attr('path');
+        if (!path || path.length < 2) return;
+
+        const points = parsePathPoints(path);
+
+        // 绘制 3 段的拖动控制胶囊
+        for (let i = 0; i < Math.min(points.length - 1, 3); i++) {
+            const pStart = points[i];
+            const pEnd = points[i + 1];
+
+            const midX = (pStart.x + pEnd.x) / 2;
+            const midY = (pStart.y + pEnd.y) / 2;
+
+            const isHorizontal = Math.abs(pStart.y - pEnd.y) < 2;
+
+            const w = isHorizontal ? 16 : 6;
+            const h = isHorizontal ? 6 : 16;
+
+            group.addShape('rect', {
+                attrs: {
+                    x: midX - w / 2,
+                    y: midY - h / 2,
+                    width: w,
+                    height: h,
+                    radius: 3,
+                    fill: '#3b82f6',
+                    cursor: isHorizontal ? 'ns-resize' : 'ew-resize',
+                    opacity: 0.95
+                },
+                name: `edge-handle-${i}`,
+                draggable: true
+            });
+        }
+    }
+}, 'polyline');
+
+window.handleNodeExpandClick = (nodeId, event) => {
+    event.stopPropagation();
+    if (window.vueAppInstance && window.vueAppInstance.toggleNode) {
+        window.vueAppInstance.toggleNode(nodeId);
+    }
+};
+
+window.handleNodeDeleteClick = (nodeId, event) => {
+    event.stopPropagation();
+    if (window.vueAppInstance && window.vueAppInstance.deleteNode) {
+        window.vueAppInstance.deleteNode(nodeId);
+    }
+};
+
+window.handleNodeDragStart = (nodeId, event) => {
+    // 仅支持鼠标左键拖动
+    if (event.button !== 0) return;
+    
+    // 排除折叠展开按钮和 SQL 容器等有自己滚动/交互的区域
+    if (event.target.closest('.card-expand-btn') || event.target.closest('.card-sql-container')) {
+        return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation(); // 阻止事件冒泡以避免触发画布 drag-canvas
+
+    const graph = window.vueAppInstance.getGraphInstance();
+    const nodeItem = graph.findById(nodeId);
+    if (!nodeItem) return;
+
+    const model = nodeItem.getModel();
+    const scale = graph.getZoom();
+
+    const startMouseX = event.clientX;
+    const startMouseY = event.clientY;
+    
+    const startNodeX = model.x || 0;
+    const startNodeY = model.y || 0;
+
+    const handleMouseMove = (moveEvent) => {
+        const dx = (moveEvent.clientX - startMouseX) / scale;
+        const dy = (moveEvent.clientY - startMouseY) / scale;
+
+        graph.updateItem(nodeItem, {
+            x: startNodeX + dx,
+            y: startNodeY + dy
+        });
+    };
+
+    const handleMouseUp = () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+};
+
+// ─── Vue App 实例化 ────────────────────────────────────────────────────────
 createApp({
     setup() {
         const entry = ref({
@@ -11,326 +277,148 @@ createApp({
 
         const leftCardCollapsed = ref(false);
         const zoomPercent = ref(100);
-        const dragMode = ref(false);
+        const dragMode = ref(true);
 
-        let mindMapInstance = null;
-        let rawTreeData = null;
+        let graphInstance = null;
+        const nodes = [];
+        const edges = [];
 
-        // Track which node IDs have already been loaded via API
-        const loadedSet = new Set();
-
-        // ─── 数据转换 ──────────────────────────────────────────────────────────────
-        /**
-         * 将后端节点格式转换为 simple-mind-map 所需格式。
-         * 规则：
-         *  - Mapper 节点 → 子节点直接使用 dbOperations 中的 SQL 语句
-         *  - 未加载的普通节点 → 添加一个"待加载"占位子节点，以便显示 + 按钮
-         *  - 已加载的普通节点 → 递归转换其 children
-         */
-        const transformNode = (node) => {
-            if (!node) return null;
-
-            const isLoaded = loadedSet.has(node.id);
-            const isExpanded = !!node.expand;
-
-            let children = [];
-
-            // 仅在已加载且处于展开状态时，才递归返回子节点
-            if (isLoaded && isExpanded && node.children && node.children.length > 0) {
-                children = node.children.map(c => transformNode(c));
+        const updateGraph = () => {
+            if (graphInstance) {
+                const clonedNodes = nodes.map(n => ({ ...n }));
+                const clonedEdges = edges.map(e => ({ ...e }));
+                graphInstance.changeData({ nodes: clonedNodes, edges: clonedEdges });
+                graphInstance.layout();
             }
+        };
 
-            return {
-                data: {
-                    text: node.methodName || node.label || '?',
-                    id: node.id,
-                    className: node.className,
-                    methodName: node.methodName,
-                    isMapper: node.isMapper,
-                    dbOperations: node.dbOperations,
-                    remarks: node.remarks,
-                    label: node.label
+        const initGraph = () => {
+            if (graphInstance) return;
+            
+            graphInstance = new G6.Graph({
+                container: 'mindMapContainer',
+                width: window.innerWidth,
+                height: window.innerHeight,
+                renderer: 'svg', // 必须使用 SVG 渲染以支持 DOM 节点
+                layout: {
+                    type: 'dagre',
+                    rankdir: 'LR',      // 从左到右布局
+                    nodesep: 45,        // 节点垂直间距
+                    ranksep: 40,        // 节点水平间距
+                    controlPoints: false
                 },
-                children
-            };
-        };
-
-        const createCustomNodeDom = (node) => {
-            const data = node.nodeData.data;
-            if (!data) return null;
-
-            // 外部包装容器，为右侧绝对定位的 + - 按钮预留空间，防止被 SVG foreignObject 剪裁
-            const wrapper = document.createElement('div');
-            wrapper.className = 'mindmap-card-wrapper';
-
-            // 卡片主容器
-            const div = document.createElement('div');
-            div.className = 'mindmap-card';
-            if (data.isMapper) {
-                div.classList.add('is-mapper');
-            } else if (rawTreeData && data.id === rawTreeData.id) {
-                div.classList.add('is-root');
-            } else {
-                div.classList.add('is-service');
-            }
-
-            // 1. 头部标题区：指示器与类型文本
-            const headerType = document.createElement('div');
-            headerType.className = 'card-header-type';
-            
-            const indicator = document.createElement('span');
-            indicator.className = 'header-indicator';
-            headerType.appendChild(indicator);
-
-            const headerText = document.createElement('span');
-            headerText.className = 'header-text';
-            if (rawTreeData && data.id === rawTreeData.id) {
-                headerText.innerText = '🎯 入口方法';
-            } else if (data.isMapper) {
-                headerText.innerText = '💾 Mapper 接口';
-            } else {
-                headerText.innerText = '⚡ Service 方法';
-            }
-            headerType.appendChild(headerText);
-            div.appendChild(headerType);
-
-            // 2. 第一行：类名
-            if (data.className) {
-                const row = document.createElement('div');
-                row.className = 'card-row';
-                
-                const label = document.createElement('span');
-                label.className = 'row-label';
-                label.innerText = '类名';
-                row.appendChild(label);
-
-                const dotIdx = data.className.lastIndexOf('.');
-                const shortName = dotIdx !== -1 ? data.className.substring(dotIdx + 1) : data.className;
-                
-                const badge = document.createElement('span');
-                badge.className = 'row-badge';
-                badge.innerText = shortName;
-                badge.setAttribute('title', data.className); // 悬浮显示完整类名
-                row.appendChild(badge);
-                
-                div.appendChild(row);
-            }
-
-            // 3. 第二行：方法名
-            if (data.methodName || data.text) {
-                const row = document.createElement('div');
-                row.className = 'card-row';
-                
-                const label = document.createElement('span');
-                label.className = 'row-label';
-                label.innerText = '方法名';
-                row.appendChild(label);
-
-                const badge = document.createElement('span');
-                badge.className = 'row-badge';
-                badge.innerText = data.methodName || data.text || '';
-                row.appendChild(badge);
-
-                div.appendChild(row);
-            }
-
-            // 4. 主体内容区（备注 & SQL 语句）
-            const body = document.createElement('div');
-            body.className = 'card-body';
-
-            // 4.1 方法简介
-            if (data.remarks) {
-                const remarksContainer = document.createElement('div');
-                remarksContainer.className = 'card-remarks-container';
-                
-                const remarksTitle = document.createElement('div');
-                remarksTitle.className = 'remarks-title';
-                remarksTitle.innerText = '方法简介';
-                remarksContainer.appendChild(remarksTitle);
-
-                const remarksContent = document.createElement('div');
-                remarksContent.className = 'remarks-content';
-                remarksContent.innerText = data.remarks;
-                remarksContainer.appendChild(remarksContent);
-
-                body.appendChild(remarksContainer);
-            }
-
-            // 4.2 SQL 语句 (仅 Mapper 且有数据时展示)
-            if (data.isMapper && data.dbOperations && data.dbOperations.length > 0) {
-                const sqlContainer = document.createElement('div');
-                sqlContainer.className = 'card-sql-container';
-
-                const sqlTitle = document.createElement('div');
-                sqlTitle.className = 'sql-title';
-                sqlTitle.innerText = 'SQL 语句';
-                sqlContainer.appendChild(sqlTitle);
-
-                data.dbOperations.forEach(op => {
-                    const sqlBox = document.createElement('div');
-                    sqlBox.className = 'sql-box';
-
-                    if (op.operationType) {
-                        const tag = document.createElement('span');
-                        tag.className = `sql-type-tag ${op.operationType.toLowerCase()}`;
-                        tag.innerText = op.operationType;
-                        sqlBox.appendChild(tag);
+                defaultNode: {
+                    type: 'custom-node',
+                    size: [300, 120]
+                },
+                defaultEdge: {
+                    type: 'custom-polyline',
+                    style: {
+                        radius: 10,
+                        offset: 20,
+                        stroke: '#000000',
+                        lineWidth: 2,
+                        endArrow: {
+                            path: G6.Arrow.triangle(8, 10, 0),
+                            fill: '#000000',
+                            stroke: '#000000',
+                            lineWidth: 1
+                        }
                     }
-
-                    const code = document.createElement('code');
-                    code.className = 'sql-code';
-                    code.innerText = op.sql || `[${op.operationType || 'SQL'}] ${op.tableName || ''}`;
-                    sqlBox.appendChild(code);
-
-                    sqlContainer.appendChild(sqlBox);
-                });
-
-                body.appendChild(sqlContainer);
-            }
-
-            // 仅在有备注或有 SQL 时才渲染 body
-            const hasBody = data.remarks || (data.isMapper && data.dbOperations && data.dbOperations.length > 0);
-            if (hasBody) {
-                div.appendChild(body);
-            }
-
-            wrapper.appendChild(div);
-
-            // 5. 自定义贴边折叠/展开按钮 (挂载到 wrapper 容器上)
-            const isLoaded = loadedSet.has(data.id);
-            const rawNode = findNode(rawTreeData, data.id);
-            
-            let showBtn = false;
-            let btnText = '+';
-            
-            if (rawNode && !rawNode.isMapper) {
-                if (!isLoaded) {
-                    showBtn = true;
-                    btnText = '+';
-                } else if (rawNode.children && rawNode.children.length > 0) {
-                    showBtn = true;
-                    btnText = rawNode.expand ? '−' : '+';
+                },
+                modes: {
+                    default: ['drag-canvas', 'zoom-canvas']
                 }
-            }
+            });
 
-            if (showBtn) {
-                const btn = document.createElement('div');
-                btn.className = 'card-expand-btn';
-                btn.innerText = btnText;
-                
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    if (!isLoaded) {
-                        loadChildren(rawNode);
+            graphInstance.on('viewportchange', () => {
+                const scale = graphInstance.getZoom();
+                zoomPercent.value = Math.round(scale * 100);
+            });
+
+            graphInstance.on('edge:mousedown', (e) => {
+                e.stopPropagation();
+                const target = e.target;
+                if (!target) return;
+                const name = target.get('name');
+                if (!name || !name.startsWith('edge-handle-')) return;
+
+                const index = parseInt(name.split('-')[2]);
+                const edgeItem = e.item;
+                if (!edgeItem) return;
+
+                const model = edgeItem.getModel();
+                const keyShape = edgeItem.getContainer().get('children')[0];
+                const path = keyShape.attr('path');
+                if (!path || path.length < 2) return;
+
+                const points = parsePathPoints(path);
+
+                let cps = model.controlPoints;
+                if (!cps || cps.length === 0) {
+                    if (points.length >= 4) {
+                        cps = [
+                            { x: points[1].x, y: points[1].y },
+                            { x: points[2].x, y: points[2].y }
+                        ];
                     } else {
-                        rawNode.expand = !rawNode.expand;
-                        rerender();
+                        cps = [];
                     }
-                });
-                
-                wrapper.appendChild(btn);
-            }
-
-            return wrapper;
-        };
-
-        // ─── 工具函数 ──────────────────────────────────────────────────────────────
-
-        /** 在 rawTreeData 树中通过 id 查找节点 */
-        const findNode = (node, id) => {
-            if (!node) return null;
-            if (node.id === id) return node;
-            if (node.children) {
-                for (const c of node.children) {
-                    const found = findNode(c, id);
-                    if (found) return found;
+                } else {
+                    cps = cps.map(p => ({ x: p.x, y: p.y }));
                 }
-            }
-            return null;
-        };
 
-        /** 将 rawTreeData 重新渲染到 MindMap */
-        const rerender = () => {
-            if (!mindMapInstance || !rawTreeData) return;
-            mindMapInstance.setData(transformNode(rawTreeData));
-        };
+                const handleMouseMove = (moveEvent) => {
+                    const point = graphInstance.getPointByClient(moveEvent.clientX, moveEvent.clientY);
 
-        // ─── 懒加载逻辑 ───────────────────────────────────────────────────────────
+                    if (cps.length < 2 && points.length >= 4) {
+                        cps = [
+                            { x: points[1].x, y: points[1].y },
+                            { x: points[2].x, y: points[2].y }
+                        ];
+                    }
 
-        /** 通过 API 加载节点子方法，并展开该节点 */
-        const loadChildren = async (rawNode) => {
-            if (!rawNode || rawNode.isMapper) return;
-            if (loadedSet.has(rawNode.id)) {
-                // 已加载：切换展开/收起
-                rawNode.expand = !rawNode.expand;
-                rerender();
-                return;
-            }
+                    if (cps.length >= 2) {
+                        if (index === 0) {
+                            cps[0].y = point.y;
+                        } else if (index === 1) {
+                            cps[0].x = point.x;
+                            cps[1].x = point.x;
+                        } else if (index === 2) {
+                            cps[1].y = point.y;
+                        }
 
-            console.log(`[LazyLoad] 加载节点: ${rawNode.label} (${rawNode.className}#${rawNode.methodName})`);
-            try {
-                const res = await fetch('/api/tree/expand', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        className: rawNode.className,
-                        methodName: rawNode.methodName
-                    })
-                });
-                if (!res.ok) {
-                    ElementPlus.ElMessage.error(`加载失败 HTTP ${res.status}`);
-                    return;
+                        graphInstance.updateItem(edgeItem, {
+                            controlPoints: cps
+                        });
+                    }
+                };
+
+                const handleMouseUp = () => {
+                    document.removeEventListener('mousemove', handleMouseMove);
+                    document.removeEventListener('mouseup', handleMouseUp);
+                };
+
+                document.addEventListener('mousemove', handleMouseMove);
+                document.addEventListener('mouseup', handleMouseUp);
+            });
+
+            graphInstance.on('edge:dblclick', (e) => {
+                e.stopPropagation();
+                const edgeItem = e.item;
+                if (edgeItem) {
+                    graphInstance.updateItem(edgeItem, {
+                        controlPoints: null
+                    });
                 }
-                const apiChildren = await res.json();
-                console.log(`[LazyLoad] 获取到 ${(apiChildren || []).length} 个子节点`);
-                rawNode.children = apiChildren || [];
-                rawNode.expand = true;
-                loadedSet.add(rawNode.id);
-                rerender();
-            } catch (e) {
-                console.error('[LazyLoad] 请求异常:', e);
-                ElementPlus.ElMessage.error('加载子节点失败：' + e.message);
-            }
+            });
+
+            window.addEventListener('resize', () => {
+                if (graphInstance) {
+                    graphInstance.changeSize(window.innerWidth, window.innerHeight);
+                }
+            });
         };
-
-        // ─── 节点交互处理 ─────────────────────────────────────────────────────────
-
-        /**
-         * 处理节点上的 + / - 按钮点击，或节点本身点击。
-         * 统一通过 rawTreeData 判断节点状态，避免依赖 nodeInstance 内部结构。
-         */
-        const handleNodeClick = (nodeInstance) => {
-            // 兼容两种 getData 调用方式
-            const nodeData = nodeInstance.getData();
-            const nodeId = (nodeData && nodeData.data && nodeData.data.id)
-                ? nodeData.data.id
-                : nodeInstance.getData('id');
-
-            if (!nodeId || !rawTreeData) return;
-
-            // 跳过占位符节点和 SQL 叶子节点
-            if (nodeId.endsWith('__ph__') || nodeId.includes('__sql__')) return;
-
-            console.log(`[Click] 节点 id=${nodeId}`);
-
-            const rawNode = findNode(rawTreeData, nodeId);
-            if (!rawNode) {
-                console.warn(`[Click] 未找到 rawNode, id=${nodeId}`);
-                return;
-            }
-
-            if (rawNode.isMapper) {
-                // Mapper 节点：切换展开/收起（SQL 子节点已在 transformNode 中准备好）
-                rawNode.expand = !rawNode.expand;
-                rerender();
-                return;
-            }
-
-            // 普通方法节点：懒加载或切换展开
-            loadChildren(rawNode);
-        };
-
-        // ─── 初始化 ───────────────────────────────────────────────────────────────
 
         const initTree = async () => {
             try {
@@ -343,85 +431,28 @@ createApp({
                     ElementPlus.ElMessage.error('初始化失败，请检查服务');
                     return;
                 }
-                rawTreeData = await res.json();
+                const rootData = await res.json();
 
-                // 根节点默认收起，点击 + 才加载下一级
-                rawTreeData.expand = false;
-                loadedSet.clear();
+                nodes.length = 0;
+                edges.length = 0;
 
-                console.log('[Init] rawTreeData:', rawTreeData);
+                const hasBody = rootData.isMapper && rootData.dbOperations && rootData.dbOperations.length > 0;
+                const height = hasBody ? 240 : (rootData.remarks ? 145 : 120);
 
-                const mapData = transformNode(rawTreeData);
+                nodes.push({
+                    id: rootData.id,
+                    className: rootData.className,
+                    methodName: rootData.methodName,
+                    isMapper: rootData.isMapper,
+                    dbOperations: rootData.dbOperations,
+                    remarks: rootData.remarks,
+                    isRoot: true,
+                    collapsed: true,
+                    size: [300, height]
+                });
 
-                if (mindMapInstance) {
-                    mindMapInstance.setData(mapData);
-                } else {
-                    mindMapInstance = new MindMap({
-                        el: document.getElementById('mindMapContainer'),
-                        data: mapData,
-                        layout: 'logicalStructure',
-                        theme: 'classic',
-                        readonly: true,
-                        alwaysShowExpandBtn: false, // 禁用默认的展开按钮
-                        hoverRectColor: 'transparent', // 隐藏悬浮和激活选中时的外围蓝色矩形框
-                        isUseCustomNodeContent: true,
-                        customCreateNodeContent: (node) => {
-                            return createCustomNodeDom(node);
-                        },
-                        themeConfig: {
-                            paddingX: 0,
-                            paddingY: 0,
-                            lineColor: '#818cf8',
-                            lineWidth: 2,
-                            root: {
-                                fillColor: 'transparent',
-                                borderColor: 'transparent',
-                                borderWidth: 0,
-                                active: {
-                                    fillColor: 'transparent',
-                                    borderColor: 'transparent'
-                                },
-                                hover: {
-                                    fillColor: 'transparent',
-                                    borderColor: 'transparent',
-                                    borderWidth: 0
-                                }
-                            },
-                            second: {
-                                fillColor: 'transparent',
-                                borderColor: 'transparent',
-                                borderWidth: 0,
-                                active: {
-                                    fillColor: 'transparent',
-                                    borderColor: 'transparent'
-                                },
-                                hover: {
-                                    fillColor: 'transparent',
-                                    borderColor: 'transparent',
-                                    borderWidth: 0
-                                }
-                            },
-                            node: {
-                                fillColor: 'transparent',
-                                borderColor: 'transparent',
-                                borderWidth: 0,
-                                active: {
-                                    fillColor: 'transparent',
-                                    borderColor: 'transparent'
-                                },
-                                hover: {
-                                    fillColor: 'transparent',
-                                    borderColor: 'transparent',
-                                    borderWidth: 0
-                                }
-                            }
-                        }
-                    });
-
-                    mindMapInstance.on('scale_change', (scale) => {
-                        zoomPercent.value = Math.round(scale * 100);
-                    });
-                }
+                initGraph();
+                updateGraph();
 
                 leftCardCollapsed.value = true;
                 ElementPlus.ElMessage.success('调用链加载成功，点击 + 按钮展开节点');
@@ -431,92 +462,216 @@ createApp({
             }
         };
 
-        // ─── 工具栏操作 ───────────────────────────────────────────────────────────
+        const expandNodeChildren = async (parentNode) => {
+            try {
+                const res = await fetch('/api/tree/expand', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        className: parentNode.className,
+                        methodName: parentNode.methodName
+                    })
+                });
+                if (!res.ok) {
+                    ElementPlus.ElMessage.error(`加载失败 HTTP ${res.status}`);
+                    return;
+                }
+                const apiChildren = await res.json();
+                if (!apiChildren || apiChildren.length === 0) return;
 
-        const zoomIn = () => {
-            if (mindMapInstance) {
-                let scale = mindMapInstance.view.scale + 0.1;
-                if (scale > 3) scale = 3;
-                mindMapInstance.view.setScale(scale);
+                apiChildren.forEach(child => {
+                    let existingNode = nodes.find(n => n.id === child.id);
+                    if (!existingNode) {
+                        const hasBody = child.isMapper && child.dbOperations && child.dbOperations.length > 0;
+                        const height = hasBody ? 240 : (child.remarks ? 145 : 120);
+                        nodes.push({
+                            id: child.id,
+                            className: child.className,
+                            methodName: child.methodName,
+                            isMapper: child.isMapper,
+                            dbOperations: child.dbOperations,
+                            remarks: child.remarks,
+                            collapsed: true,
+                            size: [300, height]
+                        });
+                    }
+                    
+                    const edgeExists = edges.some(e => e.source === parentNode.id && e.target === child.id);
+                    if (!edgeExists) {
+                        edges.push({
+                            source: parentNode.id,
+                            target: child.id,
+                            sourceAnchor: 1,
+                            targetAnchor: 0
+                        });
+                    }
+                });
+            } catch (e) {
+                console.error('[Expand] error:', e);
+                ElementPlus.ElMessage.error('加载子节点失败：' + e.message);
             }
         };
 
-        const zoomOut = () => {
-            if (mindMapInstance) {
-                let scale = mindMapInstance.view.scale - 0.1;
-                if (scale < 0.2) scale = 0.2;
-                mindMapInstance.view.setScale(scale);
+        const collapseNodeChildren = (parentId) => {
+            const outgoingEdges = edges.filter(e => e.source === parentId);
+            
+            outgoingEdges.forEach(edge => {
+                const childId = edge.target;
+                const otherParents = edges.filter(e => e.target === childId && e.source !== parentId);
+                
+                if (otherParents.length === 0) {
+                    collapseNodeChildren(childId);
+                    
+                    const nodeIdx = nodes.findIndex(n => n.id === childId);
+                    if (nodeIdx !== -1) {
+                        nodes.splice(nodeIdx, 1);
+                    }
+                }
+            });
+
+            for (let i = edges.length - 1; i >= 0; i--) {
+                if (edges[i].source === parentId) {
+                    edges.splice(i, 1);
+                }
             }
         };
 
-        const zoomReset = () => {
-            if (mindMapInstance) mindMapInstance.reset();
-        };
+        const deleteNode = (nodeId) => {
+            const nodeIndex = nodes.findIndex(n => n.id === nodeId);
+            if (nodeIndex === -1) return;
+            const node = nodes[nodeIndex];
 
-        const toggleDragMode = () => {
-            dragMode.value = !dragMode.value;
-            ElementPlus.ElMessage.info(dragMode.value ? '已开启拖拽' : '已关闭拖拽');
-        };
-
-        const undo = () => {
-            if (mindMapInstance) mindMapInstance.execCommand('BACK');
-        };
-
-        const redo = () => {
-            if (mindMapInstance) mindMapInstance.execCommand('FORWARD');
-        };
-
-        const shareLink = () => {
-            if (navigator.clipboard) {
-                navigator.clipboard.writeText(window.location.href);
-                ElementPlus.ElMessage.success('已复制页面链接，可直接分享！');
-            } else {
-                ElementPlus.ElMessage.info('链接：' + window.location.href);
-            }
-        };
-
-        const exitApp = () => {
-            ElementPlus.ElMessageBox.confirm('是否重置分析画布？', '提示', {
-                confirmButtonText: '确定',
-                cancelButtonText: '取消',
-                type: 'warning'
-            }).then(() => {
-                rawTreeData = null;
-                loadedSet.clear();
-                if (mindMapInstance) {
-                    mindMapInstance.setData({ data: { text: '请从左下角重新加载分析入口' }, children: [] });
+            // 若为根节点，清空整个画布
+            if (node.isRoot) {
+                nodes.length = 0;
+                edges.length = 0;
+                if (graphInstance) {
+                    graphInstance.clear();
                 }
                 leftCardCollapsed.value = false;
-                ElementPlus.ElMessage.success('画布已重置');
-            });
+                ElementPlus.ElMessage.success('已删除根节点，画布已重置');
+                return;
+            }
+
+            // 级联删除算法：递归收集所有孤立子节点
+            const nodesToDelete = new Set([nodeId]);
+            let foundNew = true;
+            while (foundNew) {
+                foundNew = false;
+                for (const edge of edges) {
+                    if (nodesToDelete.has(edge.source) && !nodesToDelete.has(edge.target)) {
+                        const targetParents = edges.filter(e => e.target === edge.target);
+                        const allParentsDeleted = targetParents.every(e => nodesToDelete.has(e.source));
+                        if (allParentsDeleted) {
+                            nodesToDelete.add(edge.target);
+                            foundNew = true;
+                        }
+                    }
+                }
+            }
+
+            // 移除关联的边
+            for (let i = edges.length - 1; i >= 0; i--) {
+                const edge = edges[i];
+                if (nodesToDelete.has(edge.source) || nodesToDelete.has(edge.target)) {
+                    edges.splice(i, 1);
+                }
+            }
+
+            // 从节点列表中清除
+            for (const idToDelete of nodesToDelete) {
+                const idx = nodes.findIndex(n => n.id === idToDelete);
+                if (idx !== -1) {
+                    nodes.splice(idx, 1);
+                }
+            }
+
+            updateGraph();
+            ElementPlus.ElMessage.success('节点已删除');
         };
 
-        const showHelp = () => {
-            ElementPlus.ElMessageBox.alert(
-                '1. 在左下角 🎯 输入类名和方法名，点击「加载调用链」<br/>' +
-                '2. 点击节点的 <b>+</b> 按钮，动态加载子方法调用（每次点击时请求后端）<br/>' +
-                '3. Mapper 节点点击 + 直接展开对应 SQL 语句<br/>' +
-                '4. 再次点击节点可折叠/展开',
-                '使用指南',
-                { dangerouslyUseHTMLString: true }
-            );
+        const toggleNode = async (nodeId) => {
+            const node = nodes.find(n => n.id === nodeId);
+            if (!node) return;
+
+            if (!node.collapsed) {
+                node.collapsed = true;
+                collapseNodeChildren(nodeId);
+                updateGraph();
+            } else {
+                node.collapsed = false;
+                await expandNodeChildren(node);
+                updateGraph();
+            }
         };
 
-        return {
+        const setupInstance = {
             entry,
             initTree,
             leftCardCollapsed,
             zoomPercent,
             dragMode,
-            zoomIn,
-            zoomOut,
-            zoomReset,
-            toggleDragMode,
-            undo,
-            redo,
-            shareLink,
-            exitApp,
-            showHelp
+            toggleNode,
+            deleteNode,
+            getGraphInstance: () => graphInstance,
+            zoomIn: () => {
+                if (graphInstance) {
+                    const zoom = graphInstance.getZoom();
+                    graphInstance.zoomTo(zoom + 0.1);
+                }
+            },
+            zoomOut: () => {
+                if (graphInstance) {
+                    const zoom = graphInstance.getZoom();
+                    graphInstance.zoomTo(Math.max(0.1, zoom - 0.1));
+                }
+            },
+            zoomReset: () => {
+                if (graphInstance) {
+                    graphInstance.zoomTo(1.0);
+                    graphInstance.fitView(20);
+                }
+            },
+            toggleDragMode: () => {
+                ElementPlus.ElMessage.info('拖拽缩放已在画布中默认开启。');
+            },
+            undo: () => {},
+            redo: () => {},
+            shareLink: () => {
+                if (navigator.clipboard) {
+                    navigator.clipboard.writeText(window.location.href);
+                    ElementPlus.ElMessage.success('已复制页面链接，可直接分享！');
+                } else {
+                    ElementPlus.ElMessage.info('链接：' + window.location.href);
+                }
+            },
+            exitApp: () => {
+                ElementPlus.ElMessageBox.confirm('是否重置分析画布？', '提示', {
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消',
+                    type: 'warning'
+                }).then(() => {
+                    nodes.length = 0;
+                    edges.length = 0;
+                    if (graphInstance) {
+                        graphInstance.clear();
+                    }
+                    leftCardCollapsed.value = false;
+                    ElementPlus.ElMessage.success('画布已重置');
+                });
+            },
+            showHelp: () => {
+                ElementPlus.ElMessageBox.alert(
+                    '1. 在左下角 🎯 输入类名 and 方法名，点击「加载调用链」<br/>' +
+                    '2. 点击节点的 <b>+</b> 按钮，动态加载子方法调用，关系线会自动收敛到共享节点上<br/>' +
+                    '3. 再次点击节点的 <b>−</b> 按钮可收起折叠节点',
+                    '使用指南',
+                    { dangerouslyUseHTMLString: true }
+                );
+            }
         };
+
+        window.vueAppInstance = setupInstance;
+        return setupInstance;
     }
 }).use(ElementPlus).mount('#app');
