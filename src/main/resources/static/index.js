@@ -102,18 +102,25 @@ G6.registerNode('custom-node', {
         });
     },
     getAnchorPoints(cfg) {
-        return [
-            [0, 0.5], // 左侧中心
-            [1, 0.5]  // 右侧中心
-        ];
+        const anchors = [];
+        // 左侧边缘 (x = 0)，索引为 0 到 20
+        for (let i = 0; i <= 20; i++) {
+            anchors.push([0, i / 20]);
+        }
+        // 右侧边缘 (x = 1)，索引为 21 到 41
+        for (let i = 0; i <= 20; i++) {
+            anchors.push([1, i / 20]);
+        }
+        return anchors;
     }
 });
 
 const parsePathPoints = (path) => {
-    let points = [];
     if (Array.isArray(path)) {
-        points = path.map(segment => ({ x: segment[1], y: segment[2] }));
-    } else if (typeof path === 'string') {
+        path = path.map(seg => seg.join(' ')).join(' ');
+    }
+    let points = [];
+    if (typeof path === 'string') {
         const commands = path.match(/[a-zA-Z][^a-zA-Z]*/g) || [];
         commands.forEach(cmd => {
             const type = cmd[0];
@@ -170,16 +177,20 @@ const parsePathPoints = (path) => {
     return points;
 };
 
-G6.registerEdge('custom-polyline', {
-    afterDraw(cfg, group) {
-        const keyShape = group.get('children')[0];
-        const path = keyShape.attr('path');
-        if (!path || path.length < 2) return;
+const drawHandles = (cfg, group, keyShape) => {
+    const path = keyShape.attr('path');
+    if (!path || path.length < 2) return;
 
-        const points = parsePathPoints(path);
+    const points = parsePathPoints(path);
+    const handleCount = Math.min(points.length - 1, 3);
 
-        // 绘制 3 段的拖动控制胶囊
-        for (let i = 0; i < Math.min(points.length - 1, 3); i++) {
+    // 1. 获取并更新/创建手柄
+    for (let i = 0; i < 3; i++) {
+        const handleName = `edge-handle-${i}`;
+        const children = group.get('children') || [];
+        let handle = children.find(child => child && child.get('name') === handleName);
+
+        if (i < handleCount) {
             const pStart = points[i];
             const pEnd = points[i + 1];
 
@@ -191,21 +202,44 @@ G6.registerEdge('custom-polyline', {
             const w = isHorizontal ? 16 : 6;
             const h = isHorizontal ? 6 : 16;
 
-            group.addShape('rect', {
-                attrs: {
-                    x: midX - w / 2,
-                    y: midY - h / 2,
-                    width: w,
-                    height: h,
-                    radius: 3,
-                    fill: '#3b82f6',
-                    cursor: isHorizontal ? 'ns-resize' : 'ew-resize',
-                    opacity: 0.95
-                },
-                name: `edge-handle-${i}`,
-                draggable: true
-            });
+            const attrs = {
+                x: midX - w / 2,
+                y: midY - h / 2,
+                width: w,
+                height: h,
+                radius: 3,
+                fill: '#3b82f6',
+                cursor: isHorizontal ? 'ns-resize' : 'ew-resize',
+                opacity: 0.95
+            };
+
+            if (handle) {
+                handle.attr(attrs);
+                handle.show();
+            } else {
+                group.addShape('rect', {
+                    attrs: attrs,
+                    name: handleName,
+                    draggable: true
+                });
+            }
+        } else {
+            if (handle) {
+                handle.hide();
+            }
         }
+    }
+};
+
+G6.registerEdge('custom-polyline', {
+    afterDraw(cfg, group) {
+        const keyShape = group.get('children')[0];
+        drawHandles(cfg, group, keyShape);
+    },
+    afterUpdate(cfg, item) {
+        const group = item.getContainer();
+        const keyShape = item.getKeyShape();
+        drawHandles(cfg, group, keyShape);
     }
 }, 'polyline');
 
@@ -381,16 +415,35 @@ createApp({
                     if (cps.length >= 2) {
                         if (index === 0) {
                             cps[0].y = point.y;
+                            const sourceModel = edgeItem.getSource().getModel();
+                            const sourceHeight = sourceModel.size[1];
+                            const sourceRatio = (point.y - sourceModel.y + sourceHeight / 2) / sourceHeight;
+                            const clampedRatio = Math.max(0, Math.min(1, sourceRatio));
+                            const newSourceAnchor = 21 + Math.round(clampedRatio * 20);
+
+                            graphInstance.updateItem(edgeItem, {
+                                controlPoints: cps,
+                                sourceAnchor: newSourceAnchor
+                            });
                         } else if (index === 1) {
                             cps[0].x = point.x;
                             cps[1].x = point.x;
+                            graphInstance.updateItem(edgeItem, {
+                                controlPoints: cps
+                            });
                         } else if (index === 2) {
                             cps[1].y = point.y;
-                        }
+                            const targetModel = edgeItem.getTarget().getModel();
+                            const targetHeight = targetModel.size[1];
+                            const targetRatio = (point.y - targetModel.y + targetHeight / 2) / targetHeight;
+                            const clampedRatio = Math.max(0, Math.min(1, targetRatio));
+                            const newTargetAnchor = Math.round(clampedRatio * 20);
 
-                        graphInstance.updateItem(edgeItem, {
-                            controlPoints: cps
-                        });
+                            graphInstance.updateItem(edgeItem, {
+                                controlPoints: cps,
+                                targetAnchor: newTargetAnchor
+                            });
+                        }
                     }
                 };
 
@@ -408,7 +461,9 @@ createApp({
                 const edgeItem = e.item;
                 if (edgeItem) {
                     graphInstance.updateItem(edgeItem, {
-                        controlPoints: null
+                        controlPoints: null,
+                        sourceAnchor: 31,
+                        targetAnchor: 10
                     });
                 }
             });
@@ -501,8 +556,8 @@ createApp({
                         edges.push({
                             source: parentNode.id,
                             target: child.id,
-                            sourceAnchor: 1,
-                            targetAnchor: 0
+                            sourceAnchor: 31,
+                            targetAnchor: 10
                         });
                     }
                 });
